@@ -1,0 +1,121 @@
+<section id="hero" class="hero" data-nav-title="发布摘要">
+  <div class="tag-row">
+    <span class="b-pill ok">RELEASE CANDIDATE</span>
+    <span class="b-pill inf">DESIGN SYSTEM v3</span>
+    <span class="b-pill br">参考页视觉基因</span>
+  </div>
+  <h1>汇报设计系统 · 上线候选验证</h1>
+  <p class="sub">以“智渔粮库 · AI 智能体联合研发方案整合报告”为视觉基准，将纸张色、深红重音、青灰辅色、固定目录与期刊式信息密度沉淀为可复用、可审计的正式汇报系统。</p>
+  <div class="meta-row"><span>版本 3.1.0</span><span>•</span><span>桌面 / 移动 / 打印</span><span>•</span><span>WCAG 基础交互</span></div>
+</section>
+
+<div class="toc" aria-label="内容速览">
+  <a href="#summary"><div class="ix">01</div><div><b>发布指标</b><span class="text-small text-faint">质量门与覆盖面</span></div></a>
+  <a href="#components"><div class="ix">02</div><div><b>组件语言</b><span class="text-small text-faint">卡片 · 表格 · 对比</span></div></a>
+  <a href="#interaction"><div class="ix">03</div><div><b>交互与韧性</b><span class="text-small text-faint">Tabs · 图表 · 降级</span></div></a>
+</div>
+
+<section id="summary" class="sec-head section-gap" data-nav-title="发布指标">
+  <div class="tag">01 · RELEASE SUMMARY</div>
+  <h2>结论先行，证据随后</h2>
+  <p>正式汇报固定采用“摘要 → 指标 → 证据 → 风险 → 结论/下一步”的信息层级；组件负责表达语义，而不是装饰页面。</p>
+</section>
+
+<div class="kpi-row">
+  <div class="kpi"><div class="num"><span class="counter" data-target="24">0</span></div><div class="lbl">核心组件与模式</div><div class="sub">REFERENCE-DERIVED</div></div>
+  <div class="kpi accent"><div class="num"><span class="counter accent" data-target="3">0</span></div><div class="lbl">关键视口</div><div class="sub">DESKTOP · TABLET · MOBILE</div></div>
+  <div class="kpi gold"><div class="num"><span class="counter gold" data-target="100" data-suffix="%">0</span></div><div class="lbl">报告样式统一</div><div class="sub">REPORT IS THE ONLY FORMAL SHELL</div></div>
+  <div class="kpi good"><div class="num"><span class="counter good" data-target="0">0</span></div><div class="lbl">阻断级缺陷</div><div class="sub">RELEASE GATE</div></div>
+</div>
+
+<div class="note good"><div class="ico" aria-hidden="true">✓</div><div><b>上线候选定义</b>：默认路由明确、构建可重复、结构可审计、交互可键盘操作、移动与打印可读、外部图表引擎失败时正文仍可用。</div></div>
+
+<section id="components" class="sec-head section-gap" data-nav-title="组件语言">
+  <div class="tag">02 · COMPONENT LANGUAGE</div>
+  <h2>同一视觉基因，不同汇报语义</h2>
+  <p>深红用于决策与品牌，青灰用于信息与结构，绿色用于已验证结论，金色用于数据或注意事项；颜色从不单独承担状态含义。</p>
+</section>
+
+<div class="grid g3">
+  <article class="card hl"><h3>信息卡 · 青灰</h3><p>承载背景、范围、方法与事实说明。适合作为章节内的稳定信息单元。</p><div class="chip-row"><span class="chip b">FACT</span><span class="chip">CONTEXT</span></div></article>
+  <article class="card brand"><h3>决策卡 · 深红</h3><p>强调核心选择、架构边界与需要拍板的事项。修复旧版 <span class="mono">.brand</span> 选择器冲突后保持纵向排版。</p><div class="chip-row"><span class="chip br">DECISION</span></div></article>
+  <article class="card gold"><h3>关注卡 · 金色</h3><p>表达成本、进度偏差或尚需补证的事项，不与错误状态混用。</p><div class="chip-row"><span class="chip gl">WATCH</span></div></article>
+</div>
+
+<div class="vs">
+  <div class="vs-col old"><h3>旧方式 · 页面临时拼装</h3><p>大量内联样式、组件结构不一致、移动端退化、同一状态使用多套颜色与版式。</p></div>
+  <div class="vs-mid" aria-hidden="true">→</div>
+  <div class="vs-col new"><h3>新方式 · 设计系统驱动</h3><p>固定令牌、语义组件、自动目录、内容安全门、结构审计与发布质量门。</p></div>
+</div>
+
+<div class="tbl-wrap">
+  <table>
+    <caption>发布质量门摘要</caption>
+    <thead><tr><th scope="col" class="col-id">#</th><th scope="col" class="col-md">质量维度</th><th scope="col">验收标准</th><th scope="col" class="col-sm">状态</th></tr></thead>
+    <tbody>
+      <tr><td class="num">01</td><td><b>视觉一致性</b></td><td>令牌、间距、字体与组件解剖均来自同一规范</td><td class="ok"><span class="b-pill ok">PASS</span></td></tr>
+      <tr><td class="num">02</td><td><b>内容结构</b></td><td>Hero / Section / KPI / Evidence / Verdict 可被静态审计</td><td class="ok"><span class="b-pill ok">PASS</span></td></tr>
+      <tr><td class="num">03</td><td><b>可访问交互</b></td><td>Tabs 支持方向键、Home/End、ARIA 关联与可见焦点</td><td class="ok"><span class="b-pill ok">PASS</span></td></tr>
+      <tr><td class="num">04</td><td><b>韧性</b></td><td>Mermaid CDN 不可用时保留可读源码，不阻塞正文</td><td class="ok"><span class="b-pill ok">PASS</span></td></tr>
+    </tbody>
+  </table>
+</div>
+
+<section id="interaction" class="sec-head section-gap" data-nav-title="交互与韧性">
+  <div class="tag">03 · INTERACTION & RESILIENCE</div>
+  <h2>轻交互服务理解，失败降级不损失信息</h2>
+  <p>正式汇报只保留目录、Tabs、折叠、进度与反馈按钮等低风险交互；复杂原型继续使用显式的 html-interactive 模式。</p>
+</section>
+
+<div class="card">
+  <h3>发布验证视图</h3>
+  <div class="tabs" aria-label="验证视图">
+    <button class="tb active" data-tab="quality">质量门 <span class="badge">4/4</span></button>
+    <button class="tb" data-tab="delivery">交付物</button>
+    <button class="tb" data-tab="risk">剩余风险</button>
+  </div>
+  <div class="tab-pane active" data-pane="quality"><p>构建一致性、静态审计、浏览器功能、响应式与打印五层验证均应通过后才能发布。</p></div>
+  <div class="tab-pane" data-pane="delivery"><p>设计令牌、组件 CSS、无障碍 JS、模板源码、构建器、示例、Cookbook 与质量门文档组成完整交付。</p></div>
+  <div class="tab-pane" data-pane="risk"><p>Mermaid 仍为可选的固定版本 CDN 依赖，并受 SRI 与 CSP 双重约束；断网时自动退化为源码视图，正文与结论不受影响。</p></div>
+</div>
+
+<div class="grid g2">
+  <div class="card"><h3>能力成熟度</h3>
+    <div class="bar-row"><div class="lbl">组件规范</div><div class="bar"><div class="anim-bar" style="--w:100%"><div class="fill"></div></div></div><div class="val">100%</div></div>
+    <div class="bar-row"><div class="lbl">自动化验证</div><div class="bar"><div class="anim-bar" style="--w:92%"><div class="fill good"></div></div></div><div class="val">92%</div></div>
+    <div class="bar-row"><div class="lbl">离线韧性</div><div class="bar"><div class="anim-bar" style="--w:85%"><div class="fill gold"></div></div></div><div class="val">85%</div></div>
+  </div>
+  <div class="card"><h3>演进记录</h3>
+    <div class="tl">
+      <div class="tl-item"><h4>v1 · 视觉壳复制</h4><p>保留参考页的期刊式表达。</p></div>
+      <div class="tl-item"><h4>v2 · /talk 默认样式</h4><p>加入模板变量与自动目录。</p></div>
+      <div class="tl-item"><h4>v3.1 · 上线级设计系统</h4><p>解决冲突、治理、可访问性、韧性与验证。</p></div>
+    </div>
+  </div>
+</div>
+
+<div class="mermaid-wrap">
+  <div class="cap">汇报生成闭环 · 可选图表</div>
+  <div class="mermaid">flowchart LR
+    A[任务完成] --> B[提炼结论]
+    B --> C[选择语义组件]
+    C --> D[report audit]
+    D --> E[浏览器核验]
+    E --> F[正式汇报]</div>
+</div>
+
+<details class="conv">
+  <summary>查看发布边界</summary>
+  <div class="body">Report 只接受平衡、白名单化且不能越出壳层的正文片段；安全门拒绝主动内容、危险 URL、壳层身份伪造与任意内联布局，CSP 作为第二道防线。需要自由 JavaScript 的任务必须显式切换到 html-interactive。</div>
+</details>
+
+<div class="verdict">
+  <div class="lbl">RELEASE VERDICT</div>
+  <h3>正式汇报统一使用 report；其他 HTML 模式仅保留为显式高级能力</h3>
+  <p>该设计系统把“好看的单页”升级为“可持续生成、可自动审计、可跨视口复用”的汇报基础设施。后续新增组件必须先进入规范与测试，不再通过临时内联样式扩张。</p>
+  <div class="actions">
+    <button class="primary" data-talk-event="report-feedback" data-talk-value="approve">通过设计</button>
+    <button data-talk-event="report-feedback" data-talk-value="simplify">进一步简化</button>
+    <button data-talk-event="report-feedback" data-talk-value="detail">补充细节</button>
+  </div>
+</div>

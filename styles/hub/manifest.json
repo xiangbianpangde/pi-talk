@@ -1,0 +1,18 @@
+{
+  "id": "hub",
+  "name": "Hub 原型展示台",
+  "description": "多 demo 交互原型展示壳：深色侧栏 + 分段演示区 + talkSend 事件抽屉。content = 导航模板 + demo 区块；全部 demo 逻辑内置于模板。",
+  "kind": "html-js",
+  "entry": "index.html",
+  "capabilities": [
+    "html",
+    "js",
+    "browser",
+    "realtime",
+    "events",
+    "prototype",
+    "multidemo"
+  ],
+  "version": 1,
+  "useWhen": "一次展示多个交互 demo 原型的导航壳"
+}

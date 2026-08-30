@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{{title}}</title>
+  <style>
+    :root { color-scheme: light dark; font-family: ui-sans-serif, system-ui, sans-serif; }
+    body { margin: 0; padding: 24px; }
+    h1 { font-size: 18px; margin: 0 0 8px; }
+    .sub { opacity: .65; font-size: 12px; margin-bottom: 16px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+    .card {
+      border: 1px solid color-mix(in oklab, CanvasText 18%, Canvas);
+      border-radius: 14px; padding: 14px; cursor: pointer; background: transparent;
+      text-align: left; color: inherit; font: inherit;
+    }
+    .card:hover { border-color: #6cb6ff; }
+    .card strong { display:block; margin-bottom: 6px; }
+    .body { margin-bottom: 16px; line-height: 1.5; }
+  </style>
+</head>
+<body>
+  <h1>{{title}}</h1>
+  <div class="sub">diagram-cards · click a card to send a talk event</div>
+  <div class="body">{{content}}</div>
+  <div class="grid" id="cards">
+    <!-- Agent can replace whole document; default cards remain useful demos -->
+    <button class="card" data-talk-event="choose" data-talk-value="a"><strong>Option A</strong>First path</button>
+    <button class="card" data-talk-event="choose" data-talk-value="b"><strong>Option B</strong>Second path</button>
+    <button class="card" data-talk-event="choose" data-talk-value="c"><strong>Option C</strong>Third path</button>
+  </div>
+</body>
+</html>

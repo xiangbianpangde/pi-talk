@@ -1,0 +1,10 @@
+{
+  "id": "html-static",
+  "name": "Static HTML (advanced)",
+  "description": "Explicit advanced browser HTML without a JS bridge. Not a formal-report format; use report for 汇报/验收/周报.",
+  "kind": "html",
+  "entry": "index.html",
+  "hidden": true,
+  "capabilities": ["html", "static", "browser", "advanced"],
+  "version": 2
+}

@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>EvalGrid · 评测栅格</title>
+<style>
+:root{--bg:#f7f6f2;--panel:#fffdfa;--ink:#24211b;--mut:#7a7265;--line:#e2ded4;--acc:#2f5061;--good:#3f6b3d;--warn:#7a5713;--bad:#9c3a2e;--shadow:0 1px 2px rgba(60,40,20,.05),0 10px 28px rgba(60,40,20,.07)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.55 ui-sans-serif,system-ui,"PingFang SC","Microsoft YaHei",sans-serif;padding:18px}
+.eg-wrap{max-width:1180px;margin:0 auto}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:16px}
+.eg-title{display:flex;align-items:baseline;gap:10px;margin:0 0 4px;font-size:17px}
+.eg-sub{color:var(--mut);font-size:12px;margin:0 0 14px}
+.bar{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600;color:#5a5347;margin:14px 0 8px}
+.bar .hint{color:var(--mut);font-weight:400;margin-left:auto}
+.tbl{border-collapse:collapse;width:100%;font-size:12.5px;background:#fff}
+.tbl th,.tbl td{border:1px solid var(--line);padding:7px 10px;text-align:left;vertical-align:top}
+.tbl th{background:#faf9f5;font-size:11.5px;color:#5a5347;user-select:none}
+.sc{border-radius:6px;padding:2px 9px;font-weight:700;font-size:12px;cursor:pointer;display:inline-block;min-width:36px;text-align:center}
+.btn{appearance:none;border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:8px;padding:4px 10px;font:inherit;font-size:12px;cursor:pointer}
+.btn:hover{border-color:var(--acc);color:var(--acc)}
+.btn.acc{background:var(--acc);border-color:var(--acc);color:#fff}
+.chip{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line);border-radius:999px;padding:2px 10px;font-size:11.5px;cursor:pointer;background:#fff;user-select:none;color:#5a5347}
+.chip.on{background:#eef0fb;border-color:#c7cdf2;color:var(--acc)}
+@media(max-width:760px){.eg-wrap{overflow-x:auto}.tbl{min-width:620px}}
+.pre{background:#26241f;color:#e8e2d4;border-radius:10px;padding:12px;font:11.5px/1.6 ui-monospace,Menlo,monospace;overflow:auto;margin:0;white-space:pre-wrap;word-break:break-word}
+.pre.mini{font-size:11px;max-height:140px}
+.modal{position:fixed;inset:0;background:rgba(30,26,20,.5);display:flex;align-items:center;justify-content:center;z-index:50}
+.modal .box{background:var(--panel);border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.28);width:min(640px,92vw);max-height:86vh;overflow:auto;padding:18px 20px;position:relative}
+.modal .box h3{margin:0 0 10px;font-size:15px}
+.modal .x{position:absolute;top:10px;right:12px;border:0;background:none;font-size:15px;cursor:pointer;color:var(--mut)}
+#eg-toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(16px);background:#2b2722;color:#f2efe8;padding:8px 16px;border-radius:10px;font-size:12.5px;opacity:0;pointer-events:none;transition:all .2s;z-index:60}
+#eg-toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+<div class="eg-wrap">
+  <div class="panel">
+    <h1 class="eg-title" id="eg-title">评测栅格</h1>
+    <p class="eg-sub" id="eg-sub">行 = 用例，列 = 模型。点单元格看完整输出并打分；列头可锁为 baseline。</p>
+    <div class="bar">用例 × 模型<span class="hint"><span class="chip" id="eg-failonly">只看失败/未评</span></span></div>
+    <table class="tbl" id="eg-table"></table>
+    <div class="bar">底部汇总</div>
+    <pre class="pre mini" id="eg-sum"></pre>
+  </div>
+</div>
+<div id="eg-toast"></div>
+<script id="eg-data" type="application/json">{{content}}</script>
+<script>
+(function(){
+  const $=(s,e)=>(e||document).querySelector(s);
+  const $$=(s,e)=>[...(e||document).querySelectorAll(s)];
+  const toast=msg=>{const t=$('#eg-toast'); t.textContent=msg; t.classList.add('on'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('on'),2200);};
+  const send=(type,payload)=>{ if(window.talkSend) window.talkSend(type,payload||{}); };
+  let spec=null;
+  try{ spec=JSON.parse($('#eg-data').textContent.trim()||'{}'); }catch(e){}
+  const models=Array.isArray(spec&&spec.models)?spec.models:['GPT-4o','Claude Sonnet','Qwen-Max','DeepSeek-V3'];
+  const cases=Array.isArray(spec&&spec.cases)?spec.cases.map((c,i)=>[String(c.name||('用例 '+(i+1))), String(c.desc||''), Array.isArray(c.scores)?c.scores.map(v=>v==null?null:v):models.map(()=>null)]):[];
+  const outputs=(spec&&spec.outputs)||{};
+  if(!cases.length){ $('#eg-table').innerHTML='<tr><td class="eg-empty" style="color:var(--mut);padding:20px">content 需为 JSON：{"models":[...],"cases":[{name,desc,scores:[..]}],"outputs":{...}}</td></tr>'; }
+  if(spec&&spec.title) $('#eg-title').textContent=spec.title;
+  if(spec&&spec.subtitle) $('#eg-sub').textContent=spec.subtitle;
+  const locked={};
+  function cellOutput(mi,ci){ const o=outputs[models[mi]]&&outputs[models[mi]][ci]; if(o) return o;
+    return '输入: '+(cases[ci][1]||'—')+'\n模型: '+models[mi]+'\n输出: (未提供 outputs['+JSON.stringify(models[mi])+']['+ci+']，可在蓝图中补充完整输出)'; }
+  function scoreCls(v){ return v==null?'':v<=2?'background:#f8e7e3;color:#9c3a2e':v===3?'background:#f7efdb;color:#7a5713':'background:#e8f2e7;color:#3f6b3d'; }
+  function render(){
+    const t=$('#eg-table');
+    let h='<tr><th>用例</th>';
+    models.forEach((m,i)=>{ h+='<th style="cursor:pointer" data-mi="'+i+'">'+m+(locked[i]?' <span style="color:var(--acc)">🔒基线</span>':'')+'<br/><span style="font-weight:400;font-size:10px">'+(locked[i]?'点击解锁':'点击锁为基线')+'</span></th>'; });
+    h+='<th>操作</th></tr>';
+    cases.forEach((c,ci)=>{ h+='<tr><td style="font-weight:600">'+c[0]+(c[1]?'<br/><span style="font-weight:400;color:var(--mut);font-size:10.5px">'+c[1].slice(0,34)+'…</span>':'')+'</td>';
+      c[2].forEach((v,mi)=>{ h+='<td data-c="'+ci+'" data-m="'+mi+'"><span class="sc" style="'+scoreCls(v)+'">'+(v==null?'未评':v)+'</span></td>'; });
+      h+='<td><button class="btn" data-op="'+ci+'">查看输出</button></td></tr>'; });
+    t.innerHTML=h;
+    $$('#eg-table th[data-mi]').forEach(th=>th.onclick=()=>{ const mi=+th.dataset.mi; locked[mi]=!locked[mi]; render(); updateSum(); toast(locked[mi]?'已锁 '+models[mi]+' 为 baseline（只读）':'已解锁 '+models[mi]); send('evalgrid.lock',{model:models[mi],locked:locked[mi]}); });
+    $$('#eg-table td[data-c]').forEach(td=>{ td.style.cursor=locked[+td.dataset.m]?'not-allowed':'pointer';
+      td.onclick=()=>{ const ci=+td.dataset.c, mi=+td.dataset.m;
+        if(locked[mi]){ toast(models[mi]+' 已被锁为 baseline · 只读'); return; }
+        const c=cases[ci];
+        const box=document.createElement('div'); box.className='modal';
+        box.innerHTML='<div class="box"><button class="x">✕</button><h3>'+models[mi]+' · '+c[0]+'</h3><pre class="pre">'+cellOutput(mi,ci)+'</pre><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:10px">'+
+          [1,2,3,4,5].map(n=>'<button class="btn" data-s="'+n+'">'+n+'</button>').join('')+
+          '<button class="btn" data-pf="1">PASS</button><button class="btn" data-pf="0">FAIL</button>'+
+          '<span style="margin-left:auto;color:var(--mut);font-size:11px">当前：'+(c[2][mi]==null?'未评':c[2][mi]+' 分')+'</span></div></div>';
+        document.body.appendChild(box);
+        box.querySelector('.x').onclick=()=>box.remove();
+        box.addEventListener('mousedown',e=>{ if(e.target===box) box.remove(); });
+        box.querySelectorAll('[data-s]').forEach(b=>b.onclick=()=>{ c[2][mi]=+b.dataset.s; c.pf=null; render(); updateSum(); box.remove(); send('evalgrid.score',{model:models[mi],case:c[0],score:+b.dataset.s}); toast('已打分 '+b.dataset.s); });
+        box.querySelectorAll('[data-pf]').forEach(b=>b.onclick=()=>{ c.pf=b.dataset.pf==='1'?'pass':'fail'; render(); updateSum(); box.remove(); send('evalgrid.passfail',{model:models[mi],case:c[0],verdict:c.pf}); toast(c.pf==='pass'?'PASS':'FAIL'); });
+      }; });
+    $$('#eg-table [data-op]').forEach(b=>b.onclick=()=>{ const ci=+b.dataset.op;
+      const box=document.createElement('div'); box.className='modal';
+      box.innerHTML='<div class="box"><button class="x">✕</button><h3>用例：'+cases[ci][0]+'</h3>'+models.map((m,mi)=>'<div style="margin-bottom:8px"><b style="font-size:12px">'+m+'</b><pre class="pre mini">'+cellOutput(mi,ci)+'</pre></div>').join('')+'</div>';
+      document.body.appendChild(box);
+      box.querySelector('.x').onclick=()=>box.remove();
+      box.addEventListener('mousedown',e=>{ if(e.target===box) box.remove(); });
+    });
+  }
+  function updateSum(){
+    const rows=models.map((m,mi)=>{ const scored=cases.filter(c=>c[2][mi]!=null); const avg=scored.length?(scored.reduce((s,c)=>s+c[2][mi],0)/scored.length).toFixed(1):'–';
+      const pass=scored.filter(c=>c[2][mi]>=4||c.pf==='pass').length;
+      return m+'  平均 '+(avg==='–'?avg:avg+' / 5')+'   通过 '+(scored.length?pass+'/'+scored.length+' ('+Math.round(pass/scored.length*100)+'%)':'–')+(locked[mi]?'   [BASELINE 🔒]':''); });
+    const all=cases.filter(c=>c[2].some(v=>v==null)).length;
+    $('#eg-sum').textContent=rows.join('\n')+'\n—\n待评用例: '+all+' / '+cases.length;
+  }
+  $('#eg-failonly').onclick=function(){ this.classList.toggle('on'); const on=this.classList.contains('on');
+    $$('#eg-table tr').forEach(tr=>{ const op=tr.querySelector('[data-op]'); if(!op) return; const c=cases[+op.dataset.op];
+      const bad=c[2].every(v=>v==null)||c.pf==='fail'||c[2].some(v=>v!=null&&v<=2);
+      tr.style.display=(on&&!bad)?'none':''; }); };
+  if(cases.length){ render(); updateSum(); }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,23 @@
+{
+  "id": "showcase",
+  "name": "Showcase 展示台",
+  "description": "应用画廊式展示台：agent 输出条目 JSON（标题/描述/链接/分类/状态）→ 渲染为可搜索、可分类的卡片网格，键盘可达、事件回传、响应式。适合作为多 demo / 多工具 / 产品功能的导航中心。content 传入 JSON 或留空使用内置示例。",
+  "kind": "html-js",
+  "entry": "index.html",
+  "capabilities": [
+    "html",
+    "js",
+    "showcase",
+    "gallery",
+    "cards",
+    "filter",
+    "search",
+    "navigation",
+    "keyboard",
+    "responsive",
+    "events",
+    "print"
+  ],
+  "version": "1.0.0",
+  "useWhen": "工具/功能/成果画廊,可搜索可分类的卡片导航"
+}

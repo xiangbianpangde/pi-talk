@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{{title}}</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --accent: #6cb6ff;
+      font-family: ui-sans-serif, system-ui, sans-serif;
+    }
+    body { margin: 0; padding: 24px; line-height: 1.55; }
+    main { max-width: 920px; margin: 0 auto; }
+    header { display:flex; justify-content:space-between; gap:12px; opacity:.7; font-size:12px; margin-bottom:12px; }
+    article { border: 1px solid color-mix(in oklab, CanvasText 16%, Canvas); border-radius: 12px; padding: 20px; }
+    .row { display:flex; flex-wrap:wrap; gap:8px; margin-top: 16px; }
+    button {
+      appearance:none; border:1px solid color-mix(in oklab, CanvasText 20%, Canvas);
+      background: transparent; color: inherit; border-radius: 8px; padding: 8px 12px; cursor: pointer; font: inherit;
+    }
+    button:hover { border-color: var(--accent); color: var(--accent); }
+    #talk-log { margin-top: 16px; font-size: 12px; opacity: .75; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <span>pi /talk · interactive html</span>
+      <span>{{styleId}}</span>
+    </header>
+    <article id="content">{{content}}</article>
+    <div class="row">
+      <button data-talk-event="ack" data-talk-value="got-it">Got it</button>
+      <button data-talk-event="more" data-talk-value="more-detail">More detail</button>
+      <button data-talk-event="switch" data-talk-value="draw">Switch to draw</button>
+    </div>
+    <div id="talk-log"></div>
+  </main>
+  <script>
+    // Extra demo helpers on top of the injected bridge.
+    window.addEventListener("load", () => {
+      const log = document.getElementById("talk-log");
+      const orig = window.talkSend;
+      if (typeof orig === "function") {
+        window.talkSend = (type, payload) => {
+          if (log) log.textContent = `sent: ${type} ${JSON.stringify(payload ?? null)}\n` + log.textContent;
+          return orig(type, payload);
+        };
+      }
+    });
+  </script>
+</body>
+</html>

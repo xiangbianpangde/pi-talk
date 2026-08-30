@@ -1,0 +1,16 @@
+{
+  "name": "pi-talk",
+  "version": "1.0.0",
+  "description": "Multimodal interaction engine for Pi — evolutionary style system, formal reports, interactive HTML, architecture diagrams, and more",
+  "keywords": ["pi-extension", "pi-skill", "talk", "multimodal", "report", "html-interactive", "archify", "pi coding agent"],
+  "license": "MIT",
+  "author": "xiangbianpangde",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/xiangbianpangde/pi-talk.git"
+  },
+  "bugs": {
+    "url": "https://github.com/xiangbianpangde/pi-talk/issues"
+  },
+  "homepage": "https://github.com/xiangbianpangde/pi-talk#readme"
+}

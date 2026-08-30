@@ -1,0 +1,19 @@
+{
+  "id": "canvas",
+  "name": "Canvas 白板 (Obsidian 兼容)",
+  "description": "全屏可编辑白板：卡片/连线/分组/缩放/撤销，导出 .canvas JSON 与 Obsidian 白板双向互通。content 传入 <script>window.__CANVAS__ = {...}</script>",
+  "kind": "html-js",
+  "entry": "index.html",
+  "capabilities": [
+    "html",
+    "js",
+    "browser",
+    "realtime",
+    "events",
+    "canvas",
+    "editable",
+    "obsidian"
+  ],
+  "version": 1,
+  "useWhen": "自由白板共创,需与 Obsidian canvas 互通"
+}

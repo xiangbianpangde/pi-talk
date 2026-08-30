@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<!-- Generated shell source for /talk report design system. Run: node build.mjs -->
+<html lang="zh-CN" data-report-design-system="journal">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light">
+<title>{{title}}</title>
+<!-- Mermaid is optional, SRI-pinned and loaded after the core document with a timeout. -->
+<meta name="report-mermaid" content="https://cdn.jsdelivr.net/npm/mermaid@11.16.1/dist/mermaid.min.js" data-sri="sha384-aBQXj4hK6Jm05i7aQAsUV3bLdSUrHX1BGYfMB0166TtWt/RRaw+h0Eelme9OCOvy">
+<style>
+/*__REPORT_CSS__*/
+</style>
+</head>
+<body>
+<a class="skip-link" href="#report-main">跳至正文</a>
+<div class="report-shell">
+  <aside class="report-side" aria-label="报告信息与目录">
+    <div class="report-brand">
+      <div class="mark" aria-hidden="true">{{mark}}</div>
+      <div>
+        <b>{{brand}}</b>
+        <span>{{subtitle}}</span>
+      </div>
+    </div>
+    <div class="meta">{{meta}}</div>
+    <nav id="report-nav" class="report-nav" aria-label="报告目录">{{nav}}</nav>
+    <div class="talk-badge">pi /talk · report ds v3</div>
+  </aside>
+  <main class="report-main" id="report-main" tabindex="-1">
+    <div id="report-content-root">
+{{content}}
+    </div>
+    <div id="report-trace-root"></div>
+    <footer class="report-footer">{{footer}}</footer>
+  </main>
+</div>
+<div id="report-trace-data" style="display:none">{{trace}}</div>
+<script id="report-runtime">
+/*__REPORT_JS__*/
+</script>
+</body>
+</html>

@@ -1,0 +1,20 @@
+{
+  "id": "evalgrid",
+  "name": "EvalGrid 评测栅格",
+  "description": "用例 × 模型评测对照台：点单元格看完整输出、1–5 打分 / PASS-FAIL，列可锁 baseline，底部实时汇总。content = JSON 蓝图（models / cases / outputs）。对标 Promptfoo / Braintrust / LMSYS。",
+  "kind": "html-js",
+  "entry": "index.html",
+  "capabilities": [
+    "html",
+    "js",
+    "eval",
+    "benchmark",
+    "grid",
+    "scoring",
+    "baseline",
+    "browser",
+    "events"
+  ],
+  "version": 1,
+  "useWhen": "用例 × 模型评测打分、baseline 对照(Promptfoo 式)"
+}

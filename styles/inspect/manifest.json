@@ -1,0 +1,20 @@
+{
+  "id": "inspect",
+  "name": "Inspect 截图热区标注",
+  "description": "丢进一张图，框选 / 箭头 / 点选标注热区，附标签（错位/对比度/这是按钮/看不清/其他），提交后 agent 按热区逐条答复。content = 图片 URL 或 data URL。对标 Figma 评论钉 / Label Studio。",
+  "kind": "html-js",
+  "entry": "index.html",
+  "capabilities": [
+    "html",
+    "js",
+    "annotation",
+    "image",
+    "hotspot",
+    "inspect",
+    "canvas",
+    "browser",
+    "events"
+  ],
+  "version": 1,
+  "useWhen": "截图/设计稿热区标注,逐条反馈视觉问题"
+}

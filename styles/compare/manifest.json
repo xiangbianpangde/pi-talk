@@ -1,0 +1,20 @@
+{
+  "id": "compare",
+  "name": "Compare 方案对比审阅",
+  "description": "多版本并排 diff（真实 LCS）：新增/删除/修改高亮、统计徽章、逐项采纳（接受/拒绝/改写/评论，redline 审阅环）、清洁稿导出。content = JSON {title, versions:[{name,text}]}。对标 Google Docs Suggest / GitHub review。",
+  "kind": "html-js",
+  "entry": "index.html",
+  "capabilities": [
+    "html",
+    "js",
+    "diff",
+    "compare",
+    "versions",
+    "review",
+    "redline",
+    "browser",
+    "events"
+  ],
+  "version": 1,
+  "useWhen": "多版本文案/方案并排对比、逐条采纳/redline 审阅"
+}

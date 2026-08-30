@@ -1,0 +1,74 @@
+/* /talk shared components · design tokens + neutral component classes.
+ * Styles that declare "dependencies": ["components"] in their manifest get
+ * this stylesheet injected automatically (</head> link to /api/components/tokens.css).
+ * Light-theme aware with auto dark mode; works standalone (no framework). */
+:root {
+  color-scheme: light dark;
+  --tk-bg: #f6f5f0;
+  --tk-surface: #ffffff;
+  --tk-surface-2: #f2efe8;
+  --tk-border: #d8d4c8;
+  --tk-fg: #23201a;
+  --tk-muted: #6f6a5e;
+  --tk-accent: #8a5a2b;
+  --tk-ok: #2e7d4f;
+  --tk-mid: #b07a1e;
+  --tk-no: #b3392e;
+  --tk-info: #3b6ea5;
+  --tk-radius: 10px;
+  --tk-shadow: 0 1px 3px rgba(60, 50, 20, 0.08);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --tk-bg: #17150f;
+    --tk-surface: #221f18;
+    --tk-surface-2: #2b281f;
+    --tk-border: #3d392e;
+    --tk-fg: #e8e4da;
+    --tk-muted: #a29a8a;
+    --tk-accent: #d9a05f;
+    --tk-ok: #6fce97;
+    --tk-mid: #e0b45c;
+    --tk-no: #ef6a5c;
+    --tk-info: #7fb0e3;
+  }
+}
+* { box-sizing: border-box; }
+.tk-page { max-width: 960px; margin: 0 auto; padding: 24px; line-height: 1.6; }
+.tk-kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin: 16px 0; }
+.tk-kpi { background: var(--tk-surface); border: 1px solid var(--tk-border); border-radius: var(--tk-radius); padding: 14px 16px; box-shadow: var(--tk-shadow); }
+.tk-kpi .num { font-size: 26px; font-weight: 700; color: var(--tk-accent); }
+.tk-kpi .lbl { font-size: 13px; margin-top: 4px; }
+.tk-kpi .sub { font-size: 11px; color: var(--tk-muted); }
+.tk-grid { display: grid; gap: 12px; margin: 16px 0; }
+.tk-grid.g2 { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+.tk-grid.g3 { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+.tk-card { background: var(--tk-surface); border: 1px solid var(--tk-border); border-radius: var(--tk-radius); padding: 16px 18px; box-shadow: var(--tk-shadow); }
+.tk-card h3 { margin: 0 0 8px; font-size: 16px; }
+.tk-card.hl { border-left: 4px solid var(--tk-accent); }
+.tk-pill { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 11px; font-weight: 600; border: 1px solid var(--tk-border); color: var(--tk-muted); }
+.tk-pill.ok { color: var(--tk-ok); border-color: var(--tk-ok); }
+.tk-pill.mid { color: var(--tk-mid); border-color: var(--tk-mid); }
+.tk-pill.no { color: var(--tk-no); border-color: var(--tk-no); }
+.tk-pill.inf { color: var(--tk-info); border-color: var(--tk-info); }
+.tk-table-wrap { overflow-x: auto; margin: 16px 0; }
+.tk-table-wrap table { border-collapse: collapse; width: 100%; background: var(--tk-surface); border: 1px solid var(--tk-border); border-radius: var(--tk-radius); }
+.tk-table-wrap th, .tk-table-wrap td { border: 1px solid var(--tk-border); padding: 8px 12px; text-align: left; font-size: 13px; }
+.tk-table-wrap th { background: var(--tk-surface-2); }
+.tk-note { border: 1px solid var(--tk-border); border-left-width: 4px; border-radius: var(--tk-radius); padding: 12px 16px; margin: 16px 0; background: var(--tk-surface); }
+.tk-note.info { border-left-color: var(--tk-info); }
+.tk-note.warn { border-left-color: var(--tk-mid); }
+.tk-note.crit { border-left-color: var(--tk-no); }
+.tk-note.good { border-left-color: var(--tk-ok); }
+.tk-tl { border-left: 2px solid var(--tk-border); margin: 16px 0 16px 8px; padding-left: 16px; }
+.tk-tl-item { margin: 0 0 12px; }
+.tk-tl-item .t { font-weight: 600; }
+.tk-tl-item .d { color: var(--tk-muted); font-size: 13px; }
+.tk-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0; }
+.tk-btn { appearance: none; border: 1px solid var(--tk-border); background: transparent; color: inherit; border-radius: 8px; padding: 8px 14px; cursor: pointer; font: inherit; }
+.tk-btn:hover { border-color: var(--tk-accent); color: var(--tk-accent); }
+.tk-btn.primary { background: var(--tk-accent); color: #fff; border-color: var(--tk-accent); }
+.tk-verdict { border: 1px solid var(--tk-accent); border-radius: var(--tk-radius); padding: 16px 20px; margin: 16px 0; background: var(--tk-surface); }
+.tk-verdict .lbl { font-size: 11px; letter-spacing: 0.1em; color: var(--tk-accent); text-transform: uppercase; }
+.tk-verdict h3 { margin: 6px 0; }
+.tk-tag { font-size: 11px; letter-spacing: 0.12em; color: var(--tk-muted); text-transform: uppercase; }

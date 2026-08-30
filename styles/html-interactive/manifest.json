@@ -1,0 +1,10 @@
+{
+  "id": "html-interactive",
+  "name": "Interactive HTML (advanced prototype)",
+  "description": "Explicit arbitrary HTML+JS bridge for lightweight prototypes and choice UIs. Not a formal-report format; use report for 汇报/验收/周报.",
+  "kind": "html-js",
+  "entry": "index.html",
+  "hidden": true,
+  "capabilities": ["html", "js", "browser", "realtime", "events", "prototype", "advanced"],
+  "version": 2
+}

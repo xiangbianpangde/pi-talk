@@ -1,0 +1,29 @@
+# OS files
+.DS_Store
+Thumbs.db
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-error.log*
+
+# Runtime
+*.jsonl
+sessions/
+
+# Build artifacts
+dist/
+*.mjs
+!extension/lib/talk/arch-render.mjs
+!extension/lib/talk/tests/run-tests.mjs
+!styles/report/tests/report-design-system.test.mjs
+!styles/showcase/tests/showcase.test.mjs
+!styles/report/build.mjs
+!styles/report/report.js
+
+# Editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*~

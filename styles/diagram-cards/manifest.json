@@ -1,0 +1,10 @@
+{
+  "id": "diagram-cards",
+  "name": "Diagram Cards (legacy demo)",
+  "description": "Legacy selectable-card demo retained for compatibility. Hidden from the default picker; use report for formal reporting or arch for diagrams.",
+  "kind": "html-js",
+  "entry": "index.html",
+  "hidden": true,
+  "capabilities": ["html", "js", "cards", "choice", "legacy"],
+  "version": 2
+}

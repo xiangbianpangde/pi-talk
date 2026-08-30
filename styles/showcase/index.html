@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>{{title}}</title>
+<style>
+:root{
+  --bg:#f4f3ef;--panel:#fff;--ink:#20242e;--mut:#6a7180;--line:#e4e3dd;--line2:#f0efe9;
+  --acc:#3b6cf6;--acc2:#eaf0fe;--accink:#2748b3;
+  --ok:#15803d;--okbg:#ecf9f1;--gold:#b45309;--goldbg:#fdf4e3;--violet:#6d28d9;--violetbg:#f3eefe;
+  --shadow:0 1px 2px rgba(32,36,46,.04),0 10px 28px rgba(32,36,46,.07);
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:ui-sans-serif,system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;font-size:14px;line-height:1.6}
+.app{max-width:1040px;margin:0 auto;padding:26px 20px 80px}
+/* header */
+.hd{display:flex;align-items:center;gap:14px;margin-bottom:22px;flex-wrap:wrap}
+.hd .brand{display:flex;align-items:center;gap:10px}
+.hd .logo{width:38px;height:38px;border-radius:12px;background:linear-gradient(135deg,#3b6cf6,#8250df);color:#fff;display:flex;align-items:center;justify-content:center;font-size:19px;box-shadow:0 6px 16px rgba(59,108,246,.3)}
+.hd .brand b{font-size:17px;letter-spacing:.01em}
+.hd .brand .tag{font-size:10.5px;font-weight:800;letter-spacing:.08em;color:var(--accink);background:var(--acc2);border-radius:999px;padding:3px 10px;margin-left:6px;vertical-align:2px}
+.hd .ctx{flex:1;min-width:220px;font-size:12.5px;color:var(--mut);background:var(--panel);border:1px dashed var(--line);border-radius:10px;padding:6px 12px}
+.hd .stats{font-size:11.5px;color:var(--mut);white-space:nowrap}
+.hd .stats b{color:var(--accink)}
+/* tools */
+.tools{display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap}
+.search{flex:1;min-width:220px;position:relative}
+.search .ic{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--mut);font-size:13px;pointer-events:none}
+.search input{width:100%;border:1px solid var(--line);background:var(--panel);border-radius:11px;padding:9px 12px 9px 34px;font:inherit;font-size:13px;color:var(--ink);box-shadow:var(--shadow)}
+.search input:focus{outline:2px solid var(--acc);outline-offset:1px;border-color:transparent}
+.search .kbd{position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:10px;color:var(--mut);border:1px solid var(--line);border-radius:5px;padding:1px 6px;background:var(--bg)}
+.chips{display:flex;gap:7px;flex-wrap:wrap}
+.chip{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:6px 14px;font:inherit;font-size:12px;font-weight:700;color:var(--mut);cursor:pointer;box-shadow:var(--shadow);transition:.15s}
+.chip:hover{border-color:var(--acc);color:var(--accink)}
+.chip.on{background:var(--ink);border-color:var(--ink);color:#fff}
+/* grid */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(288px,1fr));gap:14px}
+.card{display:flex;flex-direction:column;gap:9px;background:var(--panel);border:1px solid var(--line);border-radius:15px;padding:17px 18px;text-decoration:none;color:inherit;box-shadow:var(--shadow);transition:transform .16s,box-shadow .16s,border-color .16s;position:relative}
+.card:hover{transform:translateY(-2px);border-color:#c9cdf7;box-shadow:0 2px 4px rgba(32,36,46,.05),0 16px 36px rgba(32,36,46,.12)}
+.card:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.card .top{display:flex;align-items:flex-start;gap:11px}
+.card .ico{width:40px;height:40px;flex:none;border-radius:11px;background:var(--bg);border:1px solid var(--line2);display:flex;align-items:center;justify-content:center;font-size:20px}
+.card h3{margin:2px 0 0;font-size:14.5px;font-weight:800;line-height:1.35}
+.card h3 .pinyin{display:block;font-size:10.5px;font-weight:600;color:var(--mut);letter-spacing:.06em}
+.card .desc{font-size:12.5px;color:var(--mut);line-height:1.65;margin:0}
+.card .foot{display:flex;align-items:center;gap:7px;margin-top:auto;padding-top:8px;border-top:1px solid var(--line2);flex-wrap:wrap}
+.badge{font-size:10.5px;font-weight:800;border-radius:999px;padding:2px 9px;letter-spacing:.04em}
+.badge.new{background:var(--acc2);color:var(--accink)}
+.badge.ready{background:var(--okbg);color:var(--ok)}
+.badge.beta{background:var(--goldbg);color:var(--gold)}
+.badge.dev{background:var(--violetbg);color:var(--violet)}
+.cat{margin-left:auto;font-size:10.5px;color:var(--mut);border:1px solid var(--line);border-radius:999px;padding:2px 9px}
+.card .go{font-size:11px;font-weight:800;color:var(--accink)}
+/* empty */
+.empty{display:none;text-align:center;padding:60px 20px;color:var(--mut)}
+.empty.show{display:block}
+.empty .e-ico{font-size:34px;margin-bottom:10px}
+.empty p{margin:0;font-size:13px}
+/* footer */
+.foot{margin-top:26px;font-size:11.5px;color:var(--mut);text-align:center}
+/* print */
+@media print{
+  body{background:#fff}
+  .search,.chips,.card .go{display:none}
+  .card{box-shadow:none;break-inside:avoid;border:1px solid #ddd}
+}
+@media(max-width:640px){
+  .app{padding:18px 14px 60px}
+  .grid{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="hd">
+    <div class="brand"><span class="logo" id="logo">🗂</span><b id="hdTitle">交互方式展示台</b><span class="tag">SHOWCASE</span></div>
+    <div class="ctx" id="ctx">{{content}}</div>
+    <div class="stats" id="stats"></div>
+  </header>
+  <div class="tools">
+    <div class="search"><span class="ic">🔍</span><input id="q" type="text" placeholder="搜索条目名称、描述或分类…" aria-label="搜索条目"><span class="kbd">/</span></div>
+    <div class="chips" id="chips"></div>
+  </div>
+  <main class="grid" id="grid"></main>
+  <div class="empty" id="empty"><div class="e-ico">🕳</div><p>没有匹配的条目，换个关键词试试</p></div>
+  <div class="foot" id="foot"></div>
+</div>
+<script>
+// ===== 展示台数据协议 =====
+// agent 可通过 content 传入 JSON：{"title":"…","logo":"🎯","items":[{id,icon,title,sub,desc,href,cat,status}]}
+// status ∈ new|ready|beta|dev；留空则使用内置示例（当前 10 个交互 demo）。
+const BUILTIN={
+  title:"交互方式展示台",
+  logo:"🗂",
+  sub:"agent 通过 content 注入条目 JSON 即可生成此画廊",
+  items:[
+    {id:"sample-new",icon:"✨",title:"示例条目 · 新",sub:"status: new",desc:"展示台按条目 JSON 渲染卡片网格。此页面为协议示例，真实条目由 agent 注入。",href:"#",cat:"示例",status:"new"},
+    {id:"sample-ready",icon:"✅",title:"示例条目 · 可用",sub:"status: ready",desc:"支持搜索过滤、分类筛选、状态徽章与键盘导航（/ 聚焦、Esc 清空）。",href:"#",cat:"示例",status:"ready"},
+    {id:"sample-beta",icon:"🚧",title:"示例条目 · 预览",sub:"status: beta",desc:"用法见 COOKBOOK.md：content 传 JSON 或留空使用内置示例。",href:"#",cat:"示例",status:"beta"}
+  ]
+};
+// ===== 数据装配：优先 content 注入的 JSON =====
+let DATA=BUILTIN;
+(function(){
+  const ctxEl=document.getElementById("ctx");
+  const raw=(ctxEl&&ctxEl.textContent||"").trim();
+  if(!raw)return;
+  try{
+    const parsed=JSON.parse(raw);
+    if(Array.isArray(parsed))DATA={title:BUILTIN.title,logo:BUILTIN.logo,items:parsed};
+    else if(parsed&&Array.isArray(parsed.items))DATA=Object.assign({},BUILTIN,DATA,parsed);
+  }catch(e){ctxEl.style.display="none";}
+})();
+const ESC=s=>String(s??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+const STATUS={new:["new","新"],ready:["ready","可用"],beta:["beta","预览"],dev:["dev","开发中"]};
+let q="",cat="all";
+const gridEl=document.getElementById("grid"),chipsEl=document.getElementById("chips"),emptyEl=document.getElementById("empty");
+// 事件名与分类名同构，便于 agent 监听
+function cats(){const s=new Set(DATA.items.map(i=>i.cat));return ["all",...s];}
+function renderChips(){
+  chipsEl.innerHTML=cats().map(c=>{
+    const n=c==="all"?DATA.items.length:DATA.items.filter(i=>i.cat===c).length;
+    return '<button class="chip'+(cat===c?" on":"")+'" data-c="'+ESC(c)+'">'+ESC(c==="all"?"全部":c)+" ("+n+")</button>";
+  }).join("");
+  chipsEl.querySelectorAll(".chip").forEach(ch=>ch.onclick=()=>{cat=ch.dataset.c;render();if(window.talkSend)talkSend("showcase:filter",{cat});});
+}
+function renderGrid(){
+  const kw=q.trim().toLowerCase();
+  const items=DATA.items.filter(i=>{
+    if(cat!=="all"&&i.cat!==cat)return false;
+    if(!kw)return true;
+    const hay=((i.title||"")+" "+(i.desc||"")+" "+(i.cat||"")+" "+(i.sub||"")).toLowerCase();
+    return hay.includes(kw);
+  });
+  gridEl.innerHTML=items.map(i=>{
+    const st=STATUS[i.status]||STATUS.ready;
+    return '<a class="card" href="'+ESC(i.href||"#")+'" data-id="'+ESC(i.id||"")+'" data-title="'+ESC(i.title||"")+'" aria-label="'+ESC(i.title)+'">'
+      +'<div class="top"><span class="ico">'+ESC(i.icon||"🔹")+'</span><h3>'+ESC(i.title)+(i.sub?'<span class="pinyin">'+ESC(i.sub)+"</span>":"")+"</h3></div>"
+      +'<p class="desc">'+ESC(i.desc||"")+"</p>"
+      +'<div class="foot"><span class="badge '+st[0]+'">'+st[1]+"</span>"+(i.cat?'<span class="cat">'+ESC(i.cat)+"</span>":"")+'<span class="go">进入 →</span></div>'
+      +"</a>";
+  }).join("");
+  emptyEl.classList.toggle("show",items.length===0);
+  // 事件：打开条目
+  gridEl.querySelectorAll(".card").forEach(c=>{
+    c.addEventListener("click",()=>{if(window.talkSend)talkSend("showcase:open",{id:c.dataset.id,title:c.dataset.title});});
+  });
+}
+function renderStats(){
+  const n=DATA.items.length;
+  document.getElementById("stats").innerHTML="共 <b>"+n+"</b> 个条目 · <b>"+(cats().length-1)+"</b> 个分类";
+}
+function render(){
+  renderChips();renderGrid();renderStats();
+  const shown=gridEl.querySelectorAll(".card").length;
+  document.getElementById("stats").innerHTML="共 <b>"+DATA.items.length+"</b> 个条目 · <b>"+(cats().length-1)+"</b> 类 · 显示 <b>"+shown+"</b>";
+  document.getElementById("foot").textContent=DATA.sub?DATA.sub+" · 点击卡片进入对应页面，浏览器返回键或页面左上角可回此展示台":"";
+}
+const qEl=document.getElementById("q");
+qEl.addEventListener("input",()=>{q=qEl.value;render();if(window.talkSend)talkSend("showcase:search",{q});});
+document.addEventListener("keydown",e=>{
+  if(e.key==="/"&&document.activeElement!==qEl){e.preventDefault();qEl.focus();}
+  if(e.key==="Escape"&&document.activeElement===qEl){qEl.value="";q="";render();qEl.blur();}
+});
+document.getElementById("hdTitle").textContent=DATA.title||BUILTIN.title;
+document.getElementById("logo").textContent=DATA.logo||BUILTIN.logo;
+const ctxEl=document.getElementById("ctx");
+if(ctxEl&&(!ctxEl.textContent.trim()||/^[\{\[]/.test(ctxEl.textContent.trim())))ctxEl.style.display="none";
+render();
+</script>
+</body>
+</html>

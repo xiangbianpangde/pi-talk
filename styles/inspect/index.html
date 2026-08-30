@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Inspect · 截图热区标注</title>
+<style>
+:root{--bg:#f7f6f2;--panel:#fffdfa;--ink:#24211b;--mut:#7a7265;--line:#e2ded4;--acc:#2f5061;--shadow:0 1px 2px rgba(60,40,20,.05),0 10px 28px rgba(60,40,20,.07)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.55 ui-sans-serif,system-ui,"PingFang SC","Microsoft YaHei",sans-serif;padding:18px}
+.ins-wrap{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,.8fr);gap:16px;max-width:1180px;margin:0 auto}
+@media(max-width:900px){.ins-wrap{grid-template-columns:1fr}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:14px}
+.panel-title{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600;color:#5a5347;margin-bottom:10px}
+.panel-title .hint{color:var(--mut);font-weight:400;margin-left:auto;font-size:11.5px}
+.stage{position:relative}
+canvas{width:100%;border:1px solid var(--line);border-radius:10px;background:#fff;display:block}
+#ins-ov{cursor:crosshair}
+.tools{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;align-items:center}
+.chip{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line);border-radius:999px;padding:2px 11px;font-size:11.5px;cursor:pointer;background:#fff;user-select:none;color:#5a5347}
+.chip.on{background:#eef0fb;border-color:#c7cdf2;color:var(--acc)}
+.btn{appearance:none;border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:8px;padding:4px 10px;font:inherit;font-size:12px;cursor:pointer}
+.btn:hover{border-color:var(--acc);color:var(--acc)}
+.btn.acc{background:var(--acc);border-color:var(--acc);color:#fff}
+select{font:inherit;font-size:12px;border:1px solid var(--line);border-radius:8px;padding:3px 8px;background:#fff;color:var(--ink)}
+.tag{display:inline-block;border-radius:5px;padding:1px 7px;font-size:10.5px;font-weight:600;color:#fff}
+.empty{color:var(--mut);font-size:12px;text-align:center;padding:22px 8px;border:1px dashed var(--line);border-radius:10px}
+.hotspot{border:1px solid var(--line);border-radius:10px;padding:9px 11px;margin-bottom:9px;font-size:12px;background:#fff}
+.hotspot .head{display:flex;gap:6px;align-items:center}
+.hotspot .meta{color:var(--mut);font-size:10.5px}
+.reply{margin-top:6px;background:#f4f2ec;border-radius:7px;padding:6px 9px;color:#3d3830}
+.pending{margin-top:6px;color:var(--mut);font-size:11px}
+#ins-toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(16px);background:#2b2722;color:#f2efe8;padding:8px 16px;border-radius:10px;font-size:12.5px;opacity:0;pointer-events:none;transition:all .2s;z-index:60}
+#ins-toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+<div class="ins-wrap">
+  <div class="panel">
+    <div class="panel-title">截图 · 先选工具，再在图上拖/点<span class="hint" id="ins-img-hint">加载图片…</span></div>
+    <div class="stage">
+      <canvas id="ins-img" width="800" height="500"></canvas>
+      <canvas id="ins-ov" width="800" height="500" style="position:absolute;inset:0"></canvas>
+    </div>
+    <div class="tools">
+      <span class="chip on" data-tool="rect">▭ 框选</span>
+      <span class="chip" data-tool="arrow">↗ 箭头</span>
+      <span class="chip" data-tool="point">● 点选</span>
+      <select id="ins-label"><option>错位</option><option>对比度</option><option>这是按钮</option><option>看不清</option><option>其他</option></select>
+      <span style="margin-left:auto;display:flex;gap:6px">
+        <button class="btn" id="ins-undo">撤销</button>
+        <button class="btn" id="ins-clear">清空</button>
+        <button class="btn acc" id="ins-submit">提交给 agent →</button>
+      </span>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="panel-title">热区清单 · agent 逐块答复<span class="hint">talkSend · inspect.*</span></div>
+    <div id="ins-results"><div class="empty">在左侧图上标注后提交</div></div>
+  </div>
+</div>
+<div id="ins-toast"></div>
+<script id="ins-src" type="text/plain">{{content}}</script>
+<script id="ins-replies" type="text/plain">{{replies}}</script>
+<script>
+(function(){
+  const $=(s,e)=>(e||document).querySelector(s);
+  const $$=(s,e)=>[...(e||document).querySelectorAll(s)];
+  const toast=msg=>{const t=$('#ins-toast'); t.textContent=msg; t.classList.add('on'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('on'),2200);};
+  const send=(type,payload)=>{ if(window.talkSend) window.talkSend(type,payload||{}); };
+  const img=$('#ins-img'), ov=$('#ins-ov');
+  const ictx=img.getContext('2d'), ctx=ov.getContext('2d');
+  const anns=[]; let drawing=null;
+  const labelColor={错位:'#9c3a2e',对比度:'#7a5713','这是按钮':'#2f5061',看不清:'#b4479a',其他:'#7a7265'};
+  const customReplies=(function(){ try{ const t=($('#ins-replies').textContent||'').trim(); return t?JSON.parse(t):{}; }catch(e){ return {}; } })();
+  const replies=Object.assign({错位:'检测到元素错位，建议对齐栅格后复测。',对比度:'前景/背景对比不足，低于 WCAG 4.5:1，建议加深文字色。','这是按钮':'确认：该元素为按钮，已加入可点击元素清单。',看不清:'该区域渲染模糊，已标记为待重新截图。',其他:'已记录该热区，等待进一步指示。'}, customReplies);
+  let srcUrl=($('#ins-src').textContent||'').trim();
+  const srcImg=new Image();
+  function drawAnn(a,preview){
+    ctx.strokeStyle=labelColor[a.label]; ctx.fillStyle=labelColor[a.label]; ctx.lineWidth=2;
+    if(preview) ctx.setLineDash([5,4]);
+    if(a.tool==='rect'){ ctx.strokeRect(Math.min(a.x1,a.x2),Math.min(a.y1,a.y2),Math.abs(a.x2-a.x1),Math.abs(a.y2-a.y1)); }
+    else if(a.tool==='arrow'){ ctx.beginPath(); ctx.moveTo(a.x1,a.y1); ctx.lineTo(a.x2,a.y2); ctx.stroke();
+      const ang=Math.atan2(a.y2-a.y1,a.x2-a.x1); ctx.beginPath(); ctx.moveTo(a.x2,a.y2); ctx.lineTo(a.x2-10*Math.cos(ang-.4),a.y2-10*Math.sin(ang-.4)); ctx.lineTo(a.x2-10*Math.cos(ang+.4),a.y2-10*Math.sin(ang+.4)); ctx.closePath(); ctx.fill(); }
+    else { ctx.beginPath(); ctx.arc(a.x1,a.y1,5,0,7); ctx.fill(); ctx.beginPath(); ctx.arc(a.x1,a.y1,9,0,7); ctx.stroke(); }
+    ctx.setLineDash([]);
+    if(a.tool!=='arrow'){ ctx.font='11px sans-serif'; const tx=Math.min(a.x1,a.x2), ty=Math.min(a.y1,a.y2)-7; ctx.fillText(a.label,Math.max(tx,2),Math.max(ty,12)); }
+  }
+  function draw(){ ctx.clearRect(0,0,img.width,img.height); anns.forEach(a=>drawAnn(a,false)); if(drawing) drawAnn(drawing,true); }
+  function loadImage(url){
+    if(!url){ $('#ins-img-hint').textContent='content 为空 — 传入图片 URL（可 data URL）'; return; }
+    srcImg.onload=()=>{
+      const r=Math.min(img.width/srcImg.width, img.height/srcImg.height);
+      const w=Math.round(srcImg.width*r), h=Math.round(srcImg.height*r);
+      ictx.fillStyle='#fff'; ictx.fillRect(0,0,img.width,img.height);
+      ictx.drawImage(srcImg,(img.width-w)/2,(img.height-h)/2,w,h);
+      $('#ins-img-hint').textContent=srcImg.width+'×'+srcImg.height+' · 已加载';
+    };
+    srcImg.onerror=()=>{ $('#ins-img-hint').textContent='图片加载失败：'+url.slice(0,60); };
+    srcImg.src=url;
+  }
+  loadImage(srcUrl);
+  function pos(e){ const r=ov.getBoundingClientRect(); return [(e.clientX-r.left)/r.width*img.width,(e.clientY-r.top)/r.height*img.height]; }
+  ov.addEventListener('pointerdown',e=>{ const [x,y]=pos(e); drawing={tool:($('#ins-tools')||document).querySelector('.chip.on')?$('.tools .chip.on').dataset.tool:'rect',x1:x,y1:y,x2:x,y2:y,label:$('#ins-label').value}; });
+  ov.addEventListener('pointermove',e=>{ if(!drawing)return; const [x,y]=pos(e); drawing.x2=x; drawing.y2=y; draw(); });
+  ov.addEventListener('pointerup',()=>{ if(!drawing)return; const a=drawing; drawing=null;
+    if(a.tool==='point'){ anns.push({tool:'point',x1:a.x1,y1:a.y1,x2:a.x1,y2:a.y1,label:a.label}); }
+    else { if(Math.abs(a.x2-a.x1)<3&&Math.abs(a.y2-a.y1)<3){ toast('拖动太小，未记录'); draw(); return; } anns.push(a); }
+    draw(); renderList(); send('inspect.annotate',{tool:a.tool,label:a.label,x:Math.round(a.x1),y:Math.round(a.y1)}); });
+  function renderList(){
+    const r=$('#ins-results');
+    if(!anns.length){ r.innerHTML='<div class="empty">在左侧图上标注后提交</div>'; return; }
+    r.innerHTML=anns.map((a,i)=>{ const t=a.tool==='rect'?'框选':a.tool==='arrow'?'箭头':'点选';
+      return '<div class="hotspot"><div class="head"><span class="tag" style="background:'+labelColor[a.label]+'">'+a.label+'</span><span class="meta">'+t+' @ '+Math.round(a.x1)+','+Math.round(a.y1)+'</span><button class="btn" style="margin-left:auto;padding:1px 8px" data-del="'+i+'">✕</button></div>'+
+      (a.reply?'<div class="reply">🧭 '+a.reply+'</div>':'<div class="pending">待提交 →</div>')+'</div>'; }).join('');
+    $$('#ins-results [data-del]').forEach(b=>b.onclick=()=>{ anns.splice(+b.dataset.del,1); renderList(); draw(); });
+  }
+  $('#ins-submit').onclick=()=>{ if(!anns.length){ toast('先标注至少一个热区'); return; }
+    anns.forEach(a=>{ a.reply=replies[a.label]; send('inspect.hotspot',{label:a.label,reply:a.reply,x:Math.round(a.x1),y:Math.round(a.y1)}); });
+    renderList(); toast('已提交 '+anns.length+' 个热区 · agent 逐块答复'); };
+  $('#ins-undo').onclick=()=>{ anns.pop(); renderList(); draw(); };
+  $('#ins-clear').onclick=()=>{ anns.length=0; renderList(); draw(); };
+  $$('.tools .chip').forEach(c=>c.onclick=()=>{ $$('.tools .chip').forEach(x=>x.classList.toggle('on',x===c)); });
+  renderList(); draw();
+})();
+</script>
+</body>
+</html>

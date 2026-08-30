@@ -1,0 +1,23 @@
+{
+  "id": "arch",
+  "name": "架构图 Archify",
+  "description": "交互式架构/流程/时序/数据流/生命周期图。对接 tt-a1i/archify（源自 Cocoon architecture-diagram-generator）。content=Archify JSON / 完整 HTML / Mermaid。",
+  "kind": "command",
+  "command": "node \"{{extDir}}/lib/talk/arch-render.mjs\" --input \"{{file}}\" --out \"{{out}}\" --title \"{{title}}\"",
+  "serveHtml": true,
+  "outExt": ".html",
+  "capabilities": [
+    "architecture",
+    "diagram",
+    "archify",
+    "workflow",
+    "sequence",
+    "dataflow",
+    "lifecycle",
+    "mermaid",
+    "browser",
+    "interactive"
+  ],
+  "version": 2,
+  "useWhen": "架构图 / 时序 / 数据流 / 生命周期图,组件 8–12 个、一条主路径"
+}

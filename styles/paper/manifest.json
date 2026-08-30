@@ -1,0 +1,19 @@
+{
+  "id": "paper",
+  "name": "Paper 长文批注阅读",
+  "description": "左原文、右主张卡：划选一段 → 分类高亮（主张/方法/数字/待核）→ agent 抽主张、找反证、补引用；高亮可过滤。content = 原文 HTML。对标 Semantic Reader / Hypothesis / Elicit。",
+  "kind": "html-js",
+  "entry": "index.html",
+  "capabilities": [
+    "html",
+    "js",
+    "annotation",
+    "highlight",
+    "claims",
+    "reading",
+    "browser",
+    "events"
+  ],
+  "version": 1,
+  "useWhen": "长文精读批注:抽主张、标待核、找反证"
+}

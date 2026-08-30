@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Compare · 方案对比审阅</title>
+<style>
+:root{--bg:#f7f6f2;--panel:#fffdfa;--ink:#24211b;--mut:#7a7265;--line:#e2ded4;--acc:#2f5061;--good:#3f6b3d;--bad:#9c3a2e;--gold:#7a5713;--shadow:0 1px 2px rgba(60,40,20,.05),0 10px 28px rgba(60,40,20,.07)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.55 ui-sans-serif,system-ui,"PingFang SC","Microsoft YaHei",sans-serif;padding:18px}
+.cp-wrap{max-width:1240px;margin:0 auto}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:14px}
+.cp-title{display:flex;align-items:baseline;gap:10px;margin:0 0 4px;font-size:17px}
+.cp-sub{color:var(--mut);font-size:12px;margin:0 0 14px}
+.bar{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600;color:#5a5347;margin:14px 0 8px}
+.bar .hint{color:var(--mut);font-weight:400;margin-left:auto}
+.diff-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:900px){.diff-grid{grid-template-columns:1fr}}
+.dcol{min-width:0}
+.dcol h3{margin:0 0 8px;font-size:13px;color:#5a5347;display:flex;gap:8px;align-items:center}
+.dcol h3 .n{font-weight:400;font-size:10.5px;color:var(--mut)}
+.dtext{border:1px solid var(--line);border-radius:10px;max-height:420px;overflow:auto;font-size:12.5px;line-height:1.6;background:#fff}
+.drow{display:flex;gap:8px;padding:2px 10px;white-space:pre-wrap;word-break:break-word}
+.drow .ln{flex:none;width:26px;text-align:right;color:#b9b2a6;font:10.5px ui-monospace,Menlo,monospace;padding-top:1px;user-select:none}
+.drow.del{background:#f8e7e3;color:#8a3a2e}
+.drow.add{background:#e8f2e7;color:#35613a}
+.drow.same{color:#5a5347}
+.drow.mk{background:#fdf6e3;outline:1px solid #e8d9a8;cursor:pointer}
+.drow.mk .ln{color:var(--gold)}
+#cp-diffs{display:flex;flex-direction:column;gap:8px}
+.dcard{border:1px solid var(--line);border-radius:10px;background:#fff;padding:10px 12px;font-size:12.5px}
+.dcard .head{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:6px}
+.dcard .head .n{font:11px ui-monospace,Menlo,monospace;color:var(--mut)}
+.dcard .orig{color:#8a3a2e;background:#f8e7e3;border-radius:6px;padding:3px 8px;margin:2px 0;font-size:12px}
+.dcard .sugg{color:#35613a;background:#e8f2e7;border-radius:6px;padding:3px 8px;margin:2px 0;font-size:12px}
+.dcard .acts{display:flex;gap:5px;flex-wrap:wrap;margin-top:6px}
+.btn{appearance:none;border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:8px;padding:4px 10px;font:inherit;font-size:12px;cursor:pointer}
+.btn:hover{border-color:var(--acc);color:var(--acc)}
+.btn.acc{background:var(--acc);border-color:var(--acc);color:#fff}
+.btn.ok{background:var(--good);border-color:var(--good);color:#fff}
+.btn.no{background:#fff;border-color:var(--bad);color:var(--bad)}
+.chip{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line);border-radius:999px;padding:2px 9px;font-size:11px;background:#fff;color:#5a5347}
+.tag{display:inline-block;border-radius:5px;padding:1px 7px;font-size:10.5px;font-weight:600;color:#fff}
+@media(max-width:760px){.eg-wrap{overflow-x:auto}.tbl{min-width:560px}}
+.pre{background:#26241f;color:#e8e2d4;border-radius:10px;padding:12px;font:11.5px/1.6 ui-monospace,Menlo,monospace;overflow:auto;margin:0;white-space:pre-wrap;word-break:break-word}
+.pre.mini{font-size:11px;max-height:140px}
+.modal{position:fixed;inset:0;background:rgba(30,26,20,.5);display:flex;align-items:center;justify-content:center;z-index:50}
+.modal .box{background:var(--panel);border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.28);width:min(620px,92vw);max-height:86vh;overflow:auto;padding:18px 20px;position:relative}
+.modal .box h3{margin:0 0 10px;font-size:15px}
+.modal .x{position:absolute;top:10px;right:12px;border:0;background:none;font-size:15px;cursor:pointer;color:var(--mut)}
+#cp-toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(16px);background:#2b2722;color:#f2efe8;padding:8px 16px;border-radius:10px;font-size:12.5px;opacity:0;pointer-events:none;transition:all .2s;z-index:60}
+#cp-toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+<div class="cp-wrap">
+  <div class="panel">
+    <h1 class="cp-title" id="cp-title">方案对比审阅</h1>
+    <p class="cp-sub" id="cp-sub">两版本并排 diff · 差异块逐项处理（接受 / 拒绝 / 改写 / 评论）· 统计与清洁稿导出</p>
+    <div class="bar">并排 diff<span class="hint">点击差异行定位审阅块</span></div>
+    <div class="diff-grid" id="cp-cols"></div>
+    <div class="bar">差异清单 · redline 审阅<span class="hint" id="cp-stats"></span></div>
+    <div id="cp-diffs"><div class="dcard" style="color:var(--mut);text-align:center;padding:20px">解析 content JSON…</div></div>
+    <div style="display:flex;gap:8px;margin-top:14px"><button class="btn acc" id="cp-export">导出清洁稿 + 审阅记录</button></div>
+  </div>
+</div>
+<div id="cp-toast"></div>
+<script id="cp-data" type="application/json">{{content}}</script>
+<script>
+(function(){
+  const $=(s,e)=>(e||document).querySelector(s);
+  const $$=(s,e)=>[...(e||document).querySelectorAll(s)];
+  const toast=msg=>{const t=$('#cp-toast'); t.textContent=msg; t.classList.add('on'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('on'),2200);};
+  const send=(type,payload)=>{ if(window.talkSend) window.talkSend(type,payload||{}); };
+  let spec=null; try{ spec=JSON.parse($('#cp-data').textContent.trim()||'{}'); }catch(e){}
+  if(spec&&spec.title) $('#cp-title').textContent=spec.title;
+  if(spec&&spec.subtitle) $('#cp-sub').textContent=spec.subtitle;
+  const versions=Array.isArray(spec&&spec.versions)&&spec.versions.length>=2?spec.versions:[
+    {name:'版本 A',text:'第一行原文\n第二行需要修改的内容\n第三行保持不变\n第四行将被删除\n第五行保持'}];
+  const A=(versions[0].text||'').split(/\n/), B=(versions[1]&&versions[1].text||'').split(/\n/);
+  // LCS
+  const n=A.length,m=B.length;
+  const dp=Array.from({length:n+1},()=>new Array(m+1).fill(0));
+  for(let i=n-1;i>=0;i--) for(let j=m-1;j>=0;j--) dp[i][j]=A[i]===B[j]?dp[i+1][j+1]+1:Math.max(dp[i+1][j],dp[i][j+1]);
+  // diff ops
+  const ops=[];
+  (function walk(i,j){ if(i>=n&&j>=m)return;
+    if(i<n&&j<m&&A[i]===B[j]){ ops.push({t:'same',a:i,b:j}); walk(i+1,j+1); }
+    else if(j<m&&(i===n||dp[i][j+1]>=dp[i+1][j])){ ops.push({t:'add',a:-1,b:j}); walk(i,j+1); }
+    else { ops.push({t:'del',a:i,b:-1}); walk(i+1,j); } })(0,0);
+  // diff blocks (contiguous del/add runs) -> review cards
+  const blocks=[]; let cur=null;
+  ops.forEach(op=>{ if(op.t==='same'){ cur=null; return; }
+    if(!cur||cur.type!==op.t){ cur={type:op.t,lines:[],opts:[op]}; blocks.push(cur); } else cur.opts.push(op);
+    cur.lines.push(op.t==='del'?A[op.a]:B[op.b]);
+  });
+  // render columns
+  const colA=$('#cp-cols').appendChild(document.createElement('div')), colB=$('#cp-cols').appendChild(document.createElement('div'));
+  colA.className='dcol'; colB.className='dcol';
+  colA.innerHTML='<h3>'+versions[0].name+'<span class="n">'+A.length+' 行</span></h3><div class="dtext" id="cp-da"></div>';
+  colB.innerHTML='<h3>'+versions[1].name+'<span class="n">'+B.length+' 行</span></h3><div class="dtext" id="cp-db"></div>';
+  const da=$('#cp-da'), db=$('#cp-db');
+  function rowHtml(ln,cls,txt){ return '<div class="drow '+cls+'" '+(cls!=='same'?'data-mk="1"':'')+'><span class="ln">'+(ln<0?'':ln+1)+'</span><span>'+txt+'</span></div>'; }
+  ops.forEach(op=>{ if(op.t==='same'){ da.insertAdjacentHTML('beforeend',rowHtml(op.a,'same',A[op.a])); db.insertAdjacentHTML('beforeend',rowHtml(op.b,'same',B[op.b])); }
+    else if(op.t==='del'){ da.insertAdjacentHTML('beforeend',rowHtml(op.a,'del',A[op.a])); db.insertAdjacentHTML('beforeend','<div class="drow same" style="background:#faf9f5"><span class="ln"></span><span style="color:#c4beb2">—</span></div>'); }
+    else { da.insertAdjacentHTML('beforeend','<div class="drow same" style="background:#faf9f5"><span class="ln"></span><span style="color:#c4beb2">—</span></div>'); db.insertAdjacentHTML('beforeend',rowHtml(op.b,'add',B[op.b])); } });
+  // 词级二次 diff：将相邻 del/add 块配对，块内相同词淡化、差异词高亮
+  function wordLCS(a, b) {
+    const wa=a.split(/(\s+)/), wb=b.split(/(\s+)/);
+    const n=wa.length, m=wb.length;
+    const dp=Array.from({length:n+1},()=>new Array(m+1).fill(0));
+    for(let i=n-1;i>=0;i--) for(let j=m-1;j>=0;j--) dp[i][j]=wa[i]===wb[j]?dp[i+1][j+1]+1:Math.max(dp[i+1][j],dp[i][j+1]);
+    const keep=new Set();
+    (function walk(i,j){ if(i>=n||j>=m)return; if(wa[i]===wb[j]){ keep.add(i); walk(i+1,j+1); } else if(dp[i][j+1]>=dp[i+1][j]) walk(i,j+1); else walk(i+1,j); })(0,0);
+    return {wa, keep};
+  }
+  function pairDiffHtml(delText, addText, delBg, addBg, sameColor, delColor, addColor){
+    const {wa, keep}=wordLCS(delText, addText);
+    let del='', add='', di=0, ai=0;
+    const walk=[]; // reuse dp positions: simpler — mark keep on wa indices
+    // build aligned output: iterate wa with keep flag; wb positions not kept are highlighted
+    const delParts=[], addParts=[];
+    // find which wb indices are matched: track via LCS again storing pairs
+    const wb=addText.split(/(\s+)/);
+    const n=wa.length, m=wb.length;
+    const dp=Array.from({length:n+1},()=>new Array(m+1).fill(0));
+    for(let i=n-1;i>=0;i--) for(let j=m-1;j>=0;j--) dp[i][j]=wa[i]===wb[j]?dp[i+1][j+1]+1:Math.max(dp[i+1][j],dp[i][j+1]);
+    const matchedB=new Set();
+    (function walk2(i,j){ if(i>=n||j>=m)return; if(wa[i]===wb[j]){ matchedB.add(j); walk2(i+1,j+1); } else if(dp[i][j+1]>=dp[i+1][j]) walk2(i,j+1); else walk2(i+1,j); })(0,0);
+    wa.forEach((w,i)=>{ const same=keep.has(i);
+      delParts.push(same?('<span style="color:'+sameColor+'">'+w+'</span>'):('<span style="background:'+delBg+';color:'+delColor+';border-radius:3px;padding:0 2px">'+w+'</span>')); });
+    wb.forEach((w,j)=>{ const same=matchedB.has(j);
+      addParts.push(same?('<span style="color:'+sameColor+'">'+w+'</span>'):('<span style="background:'+addBg+';color:'+addColor+';border-radius:3px;padding:0 2px">'+w+'</span>')); });
+    return {del:delParts.join(''), add:addParts.join('')};
+  }
+  // 配对 del→add 块
+  // 配对 del↔add：按词袋相似度（LCS walk 可能输出 [add, del] 顺序，相邻法不可靠）
+  const pairOf=new Array(blocks.length).fill(-1);
+  function bagSim(a, b){
+    const ta=new Set(a.split(/[^\p{L}\p{N}]+/u).filter(Boolean));
+    const tb=new Set(b.split(/[^\p{L}\p{N}]+/u).filter(Boolean));
+    let c=0; ta.forEach(t=>{ if(tb.has(t)) c++; });
+    return c/(Math.sqrt(ta.size*tb.size)||1);
+  }
+  blocks.forEach((b,bi)=>{
+    if(b.type!=='del') return;
+    let best=-1, bs=0.15;
+    blocks.forEach((o,oi)=>{ if(o.type!=='add') return;
+      const sc=bagSim(b.lines.join('\n'), o.lines.join('\n'));
+      if(sc>bs){ bs=sc; best=oi; } });
+    if(best>=0){ pairOf[bi]=best; pairOf[best]=bi; }
+  });
+  // review cards
+  const states=new Array(blocks.length).fill('pending');
+  const applied={};
+  function stats(){ const d=blocks.filter((_,i)=>states[i]!=='pending').length;
+    $('#cp-stats').textContent='待决 '+(blocks.length-d)+' · 已处理 '+d+' · 采纳 '+states.filter(s=>s==='accepted').length+' · 拒绝 '+states.filter(s=>s==='rejected').length+' · 改写 '+states.filter(s=>s==='rewritten').length+' · 评论 '+blocks.filter((_,i)=>applied['cm'+i]!==undefined).length; }
+  function renderCards(){
+    const box=$('#cp-diffs');
+    if(!blocks.length){ box.innerHTML='<div class="dcard" style="color:var(--mut);text-align:center;padding:20px">两版本完全一致，无差异</div>'; return; }
+    box.innerHTML=blocks.map((b,bi)=>{
+      const st=states[bi];
+      const orig=b.type==='del'?b.lines.join('\n'):'';
+      const sugg=b.type==='add'?b.lines.join('\n'):'';
+      const dec=st==='accepted'?'<span class="tag" style="background:var(--good)">已采纳</span>':st==='rejected'?'<span class="tag" style="background:#b9b2a6">已拒绝</span>':st==='rewritten'?'<span class="tag" style="background:var(--gold)">已改写</span>':st==='commented'?'<span class="tag" style="background:var(--acc)">已评论</span>':'<span class="tag" style="background:#c4beb2">待决</span>';
+      let origHtml='', suggHtml='';
+      if(b.type==='del'){
+        const nb=pairOf[bi];
+        const other=nb>=0?blocks[nb].lines.join('\n'):'';
+        if(other){ const d=pairDiffHtml(b.lines.join('\n'), other, '#f8e7e3', '#e8f2e7', '#8a3a2e', '#8a3a2e', '#35613a'); origHtml='<div class="orig">'+d.del+'</div>'; suggHtml='<div class="sugg">'+d.add+'</div>'; }
+        else { origHtml='<div class="orig">'+b.lines.join('\n').replace(/</g,'&lt;')+'</div>'; }
+      } else {
+        const pb=pairOf.findIndex(p=>p===bi);
+        const other=pb>=0?blocks[pb].lines.join('\n'):'';
+        if(other){ const d=pairDiffHtml(other, b.lines.join('\n'), '#f8e7e3', '#e8f2e7', '#35613a', '#8a3a2e', '#35613a'); origHtml='<div class="orig">'+d.del+'</div>'; suggHtml='<div class="sugg">'+d.add+'</div>'; }
+        else { suggHtml='<div class="sugg">'+b.lines.join('\n').replace(/</g,'&lt;')+'</div>'; }
+      }
+      return '<div class="dcard" data-b="'+bi+'"><div class="head"><span class="n">#'+bi+'</span><span class="tag" style="background:'+(b.type==='del'?'var(--bad)':'var(--good)')+'">'+(b.type==='del'?'删除':'新增')+' · '+b.lines.length+' 行</span>'+dec+'</div>'+
+        origHtml+suggHtml+
+        '<div class="acts"><button class="btn ok" data-a="accept">接受</button><button class="btn no" data-a="reject">拒绝</button><button class="btn" data-a="rewrite">改写</button><button class="btn" data-a="comment">评论</button></div></div>'; }).join('');
+    const diffsBox=$('#cp-diffs');
+    diffsBox.onclick=(ev)=>{
+      const card=ev.target.closest('.dcard'); if(!card) return;
+      const bi=+card.dataset.b;
+      const act=ev.target.closest('[data-a]');
+      if(act&&act.dataset.a==='accept'){ states[bi]='accepted'; renderCards(); stats(); send('compare.decide',{i:bi,decision:'接受'}); toast('已接受 #'+bi); return; }
+      if(act&&act.dataset.a==='reject'){ states[bi]='rejected'; renderCards(); stats(); send('compare.decide',{i:bi,decision:'拒绝'}); toast('已拒绝 #'+bi); return; }
+      if(act&&act.dataset.a==='rewrite'){
+        const ex=card.querySelector('.extra');
+        if(ex&&ex.dataset.mode==='rw'){ ex.style.display=ex.style.display==='none'?'':'none'; return; }
+        card.querySelectorAll('.extra').forEach(e=>e.remove());
+        const d=document.createElement('div'); d.className='extra'; d.dataset.mode='rw';
+        d.style.cssText='display:flex;flex-direction:column;gap:5px;margin-top:6px';
+        d.innerHTML='<input placeholder="输入改写文本（空 = 删除该块）" style="font:inherit;font-size:12px;border:1px solid var(--line);border-radius:7px;padding:4px 8px"/><div style="display:flex;gap:5px"><button class="btn acc" data-ok="1">应用</button><button class="btn" data-ok="0">取消</button></div>';
+        card.appendChild(d);
+        return; }
+      if(act&&act.dataset.a==='comment'){
+        const ex=card.querySelector('.extra');
+        if(ex&&ex.dataset.mode==='cm'){ ex.style.display=ex.style.display==='none'?'':'none'; return; }
+        card.querySelectorAll('.extra').forEach(e=>e.remove());
+        const d=document.createElement('div'); d.className='extra'; d.dataset.mode='cm';
+        d.style.cssText='display:flex;flex-direction:column;gap:5px;margin-top:6px';
+        d.innerHTML='<textarea rows="2" placeholder="评论…" style="font:inherit;font-size:12px;border:1px solid var(--line);border-radius:7px;padding:4px 8px"></textarea><div style="display:flex;gap:5px"><button class="btn acc" data-ok="1">保存</button><button class="btn" data-ok="0">取消</button></div>';
+        card.appendChild(d);
+        return; }
+      const ok=ev.target.closest('[data-ok]'); if(!ok) return;
+      const extra=card.querySelector('.extra'); if(!extra) return;
+      if(ok.dataset.ok==='0'){ extra.remove(); return; }
+      if(extra.dataset.mode==='rw'){ const v=extra.querySelector('input').value; states[bi]='rewritten'; applied['rw'+bi]=v; renderCards(); stats(); send('compare.decide',{i:bi,decision:'改写',text:v}); toast('已改写 #'+bi); }
+      else if(extra.dataset.mode==='cm'){ const v=extra.querySelector('textarea').value; if(!v.trim()){ toast('写点评论'); return; } if(states[bi]==='pending') states[bi]='commented'; applied['cm'+bi]=v; renderCards(); stats(); send('compare.comment',{i:bi,comment:v}); toast('已评论 #'+bi); }
+    };
+  }
+  // click diff row -> scroll to card
+  $$('.drow[data-mk]').forEach(r=>r.onclick=()=>{ /* locate card by scanning: skip — map via ops index */ });
+  renderCards(); stats();
+  $('#cp-export').onclick=()=>{
+    const clean=[]; let ai=0;
+    ops.forEach(op=>{ if(op.t==='same'){ clean.push(A[op.a]); }
+      else if(op.t==='del'){ const bi=blocks.findIndex(b=>b.opts&&b.opts[0]===op); /* fallback */ }
+    });
+    // simpler clean draft: apply accepted additions in order
+    const lines=[]; let lastBi=-1;
+    ops.forEach(op=>{
+      if(op.t==='same'){ lines.push(A[op.a]); lastBi=-1; return; }
+      const bi=blocks.findIndex(b=>b.opts&&b.opts.includes(op));
+      if(bi<0) return;
+      const st=states[bi];
+      if(op.t==='del'){
+        if(st==='rejected'){ lines.push(A[op.a]); return; }
+        if(bi===lastBi) return; lastBi=bi;
+        if(st==='rewritten'&&applied['rw'+bi]!==undefined) lines.push(applied['rw'+bi]);
+      } else {
+        if(bi===lastBi) return; lastBi=bi;
+        if(st==='accepted') lines.push(blocks[bi].lines.join('\n'));
+        else if(st==='rewritten'&&applied['rw'+bi]!==undefined) lines.push(applied['rw'+bi]);
+      }
+    });
+    const rec=blocks.map((b,bi)=>'['+(states[bi]||'待决')+'] #'+bi+' '+(b.type==='del'?'删除 '+b.lines.length+' 行':'新增 '+b.lines.length+' 行')+(applied['cm'+bi]?' ｜ 评论: '+applied['cm'+bi]:'')).join('\n');
+    document.querySelectorAll('.modal').forEach(function(x){ x.remove(); });
+    const m=document.createElement('div'); m.className='modal';
+    m.innerHTML='<div class="box"><button class="x">✕</button><h3>导出 · 清洁稿 + 审阅记录</h3><div class="bar">清洁稿（应用已接受/改写）</div><pre class="pre mini">'+lines.join('\n').replace(/</g,'&lt;')+'</pre><div class="bar">审阅记录</div><pre class="pre mini">'+rec.replace(/</g,'&lt;')+'</pre></div>';
+    document.body.appendChild(m);
+    m.querySelector('.x').onclick=()=>m.remove();
+    m.addEventListener('mousedown',e=>{ if(e.target===m) m.remove(); });
+    send('compare.export',{clean:lines.join('\n'),records:rec});
+  };
+})();
+</script>
+</body>
+</html>
