@@ -17,6 +17,7 @@
 - **Visual self-check** — `talk_verify` screenshots + console error checks before every render delivery
 - **Export pipeline** — html snapshot, GFM markdown, full-page png, print pdf
 - **Formal report design system** — `report` style with journal-grade layout, KPI/card/evidence table/timeline/verdict components, content audit, CSP, Mermaid support
+- **Explanation Layer** — `talk_explain` validates an ExplanationPlan (`explain.ir/v1`: shallow→deep layers, mandatory analogy-breakage + limitations, optional understanding checks) and renders it as a governed report; ELI5/Feynman/Socratic are strategies over one IR, not new styles
 
 ## Architecture
 
@@ -25,6 +26,7 @@
 ├── extensions/
 │   ├── talk.ts              # Main extension entry point
 │   └── lib/talk/            # Core engine (server, session, registry, verify, export, audit…)
+│       └── explain/         # Explanation Layer: explain.ir/v1 types + fail-closed validator + report compiler
 ├── skills/talk/
 │   └── SKILL.md             # Agent skill: when & how to use /talk
 └── talk/
@@ -72,6 +74,7 @@
 | `talk_list_styles` | Discover styles |
 | `talk_set_style` | Switch style |
 | `talk_render` | Render to active surface |
+| `talk_explain` | Validate + render an ExplanationPlan as a governed report (layered explanation) |
 | `talk_poll_events` | Read user interaction events |
 | `talk_verify` | Visual self-check |
 | `talk_export` | Export surface |

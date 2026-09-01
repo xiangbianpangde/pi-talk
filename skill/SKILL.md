@@ -41,6 +41,7 @@ report classes, **not** inline-styled `html-interactive` soup.
 | 架构图 / 时序 / 数据流 / 系统地图 | **`arch`** | Archify JSON |
 | 画布共创 | **`draw`** | tldraw |
 | 多版本文案/方案并排对比、redline 审阅 | `compare` | content = JSON {versions:[…]} |
+| 分层解释（ELI5/机制/代码/类比 + 理解检查） | **`talk_explain` 工具** | 不选样式，直接给 ExplanationPlan IR；渲染进 report |
 | 用例 × 模型评测打分、baseline 对照 | `evalgrid` | content = JSON 蓝图 |
 | 长文精读批注(抽主张/找反证) | `paper` | content = 原文 HTML |
 | 截图/设计稿热区标注反馈 | `inspect` | content = 图片 URL/dataURL |
@@ -57,6 +58,7 @@ report classes, **not** inline-styled `html-interactive` soup.
 2. `report` 是唯一正式汇报壳（治理能力由 manifest 的 `"governance": "report"` 声明，其它包将来可复用）；`html-interactive` 只适合轻交互原型，不能作为另一套汇报格式。
 3. `talk_render` 返回 report audit 后，修复全部 error 和 warning（交付目标为 0/0）；不要通过切换到 raw HTML 样式绕过设计系统。
 4. 若当前 session 已是错误样式，立刻 `talk_set_style` 切换后 `talk_render` 重渲，不要在错误壳上继续堆内容。
+5. 分层解释走 `talk_explain`，不要手写 `html-interactive` 解释页：用户说「解释一下 / 我没懂 / 用大白话 / 给新人讲」且需要分层或可视化时，构造 `explain.ir/v1` 的 ExplanationPlan（一句话核心 → 机制/例子/代码/类比层 → 1–3 条 limitations → 可选 0–2 个理解检查），一次调用完成校验+渲染。类比层必须给 `analogyBreakage`（类比在哪里失效）；`answerId` 只留在 IR 里，页面不显示正确答案；答错后重渲整页（不要 patch 治理面）。
 
 ## Commands (user)
 
@@ -84,6 +86,7 @@ report classes, **not** inline-styled `html-interactive` soup.
 | `talk_list_styles` | Discover styles (set `reload: true` after adding packs) |
 | `talk_set_style` | Switch style (`chat`, `html-static`, `html-interactive`, `draw`, packs…) |
 | `talk_render` | Render to the active surface; supports `surface` (multi-surface), `patch` (incremental DOM update) and `verify` (auto screenshot+console) |
+| `talk_explain` | Validate an ExplanationPlan (`explain.ir/v1`) and render it as a governed report: layered explanation + analogy breakage + limitations + optional checks. Fails closed |
 | `talk_poll_events` | Read clicks / `talkSend` events / form submissions / debounced input events |
 | `talk_verify` | Visual self-check: headless screenshot + console errors + DOM stats of the current surface |
 | `talk_export` | Export current surface: html / md / png / pdf |

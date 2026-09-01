@@ -34,6 +34,8 @@ import {
 } from "./lib/talk/session";
 import { verifySurface } from "./lib/talk/verify";
 import { exportSurface } from "./lib/talk/export";
+import { formatExplainIssues, parseExplanationPlan } from "./lib/talk/explain/validate";
+import { compileExplanation } from "./lib/talk/explain/render";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 
@@ -498,6 +500,84 @@ export default function (pi: ExtensionAPI) {
 					},
 				],
 				details: result,
+			};
+		},
+	});
+
+	pi.registerTool({
+		name: "talk_explain",
+		label: "Talk explain",
+		description:
+			"Validate an ExplanationPlan (explain.ir/v1) and render it as a governed /talk report: one-sentence core, layered progressive disclosure, mandatory analogy breakage, limitations block and optional understanding checks. Fails closed — invalid IR renders nothing.",
+		promptSnippet:
+			"Render layered explanations (ELI5 / mechanism / code / analogy) from an ExplanationPlan into the governed report surface",
+		promptGuidelines: [
+			"Use talk_explain when the explanation needs layers or visuals (解释一下/我没懂/用大白话讲/给新人介绍); a two-sentence answer stays in plain text.",
+			"talk_explain fails closed: fix every reported error before retrying, and never rebuild the same page by hand in html-interactive.",
+			"Understanding-check clicks arrive as explain-check events with value checkId::choiceId; read them with talk_poll_events, judge against plan.checks[].answerId, then re-render the full plan — patching a governed report bypasses its audit.",
+		],
+		parameters: Type.Object({
+			planJson: Type.String({
+				description:
+					"ExplanationPlan JSON: {schema:'explain.ir/v1', topic, audience:'beginner|intermediate|expert', layers:[{id,kind:'core|mechanism|example|code|analogy',title,content,analogyBreakage?}], limitations:[1-3], checks?:[{id,afterLayerId,question,choices:[{id,label}],answerId}]}",
+			}),
+			title: Type.Optional(Type.String({ description: "Surface title (defaults to plan.topic)" })),
+			open: Type.Optional(Type.Boolean({ description: "Open/focus the surface after render" })),
+			verify: Type.Optional(
+				Type.Boolean({ description: "Run the visual self-check (screenshot + console) after render" }),
+			),
+		}),
+		async execute(_id, params) {
+			const rt = getRuntime();
+			const validation = parseExplanationPlan(params.planJson);
+			if (!validation.valid || !validation.plan) {
+				return {
+					content: [
+						{
+							type: "text",
+							text: `ERROR · ExplanationPlan rejected (explain.ir/v1), nothing rendered.\n${formatExplainIssues(
+								validation.errors,
+							)}\n\nWarnings:\n${validation.warnings.length ? formatExplainIssues(validation.warnings) : "(none)"}`,
+						},
+					],
+					details: { ok: false, validation },
+				};
+			}
+			const compiled = compileExplanation(validation.plan);
+			const result = await renderTalk(
+				{
+					styleId: "report",
+					content: compiled.html,
+					meta: compiled.meta,
+					title: params.title || validation.plan.topic,
+					open: params.open,
+					verify: params.verify,
+				},
+				rt,
+			);
+			const audit = (result.details as { audit?: { errors?: unknown[]; warnings?: unknown[] } } | undefined)?.audit;
+			const lines = [
+				result.ok ? "OK" : "ERROR",
+				result.message,
+				`ir: ${compiled.sections} sections · ${validation.plan.layers.length} layers · ${validation.plan.limitations.length} limitations · ${validation.plan.checks?.length ?? 0} checks`,
+				validation.warnings.length
+					? `IR warnings:\n${formatExplainIssues(validation.warnings)}`
+					: "IR warnings: (none)",
+				result.url ? `url: ${result.url}` : "",
+				result.file ? `file: ${result.file}` : "",
+			].filter(Boolean);
+			return {
+				content: [{ type: "text", text: lines.join("\n") }],
+				details: {
+					ok: result.ok,
+					styleId: result.styleId,
+					url: result.url,
+					file: result.file,
+					validation: { errors: validation.errors, warnings: validation.warnings, stats: validation.stats },
+					plan: validation.plan,
+					reportAudit: audit,
+					render: result.details,
+				},
 			};
 		},
 	});

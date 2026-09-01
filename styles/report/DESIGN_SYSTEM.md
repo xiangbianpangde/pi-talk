@@ -123,6 +123,7 @@ Modifiers: `.hl`, `.brand`, `.gold`, `.good`, `.crit`; grid: `.grid.g2` through 
 | Proposal / review | Hero → problem evidence → option comparison → architecture/plan → decision request |
 | Research summary | Hero → question/method → evidence table → findings cards → limitations note → conclusion |
 | Incident / audit | Hero → severity KPIs → timeline → root-cause table → remediation → acceptance verdict |
+| Explanation (`talk_explain`) | Hero (topic + audience pills) → one-sentence core → deeper layers as `details.hook` sections → analogy with its breakage note → limitations note → understanding checks (`.actions` buttons) → verdict as the one sentence to remember |
 
 ## 8. Accessibility contract
 

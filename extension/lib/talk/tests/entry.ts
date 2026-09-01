@@ -5,6 +5,8 @@
 import { startTalkServer, injectBridge, getBridgeVersion, applyPatchToHtml, compileCompoundSelector } from "../server";
 import { loadStyleRegistry, parseManifest, validateManifest, getStyleById } from "../registry";
 import { auditReportContent } from "../report-audit";
+import { parseExplanationPlan, validateExplanationPlan } from "../explain/validate";
+import { compileExplanation, renderMarkdownLite } from "../explain/render";
 import { lintHtmlFragment } from "../lint";
 import { htmlToMarkdown, exportSurface } from "../export";
 import { resolveChrome, chromeCapture } from "../verify";
@@ -412,6 +414,192 @@ test("registry: governance + useWhen parsed from manifests", () => {
 	const m = parseManifest({ id: "g", kind: "html-js", entry: "index.html", governance: "report", useWhen: "x" }, "g");
 	eq(m?.governance, "report", "manifest governance parsed");
 	eq(m?.useWhen, "x", "manifest useWhen parsed");
+});
+
+// ---------- 13. Explanation Layer: explain.ir/v1 ----------
+function explainPlan(overrides: Record<string, unknown> = {}): unknown {
+	return {
+		schema: "explain.ir/v1",
+		topic: "为什么网关偶发 502",
+		audience: "beginner",
+		layers: [
+			{ id: "core", kind: "core", title: "一句话", content: "上游服务在 3 秒内没回话，网关就替它回了 502。" },
+			{
+				id: "mechanism",
+				kind: "mechanism",
+				title: "超时链条",
+				content: "- 网关只等 3 秒\n- 上游 P99 是 4.1 秒\n- 慢请求于是变成 502",
+			},
+			{
+				id: "analogy",
+				kind: "analogy",
+				title: "像餐厅",
+				content: "服务员等厨房 3 分钟，超时就直接告诉客人「没做」。",
+				analogyBreakage: "厨房超时后会继续做菜，网关之后的上游请求也还在跑，可能已经写库了。",
+			},
+			{ id: "code", kind: "code", title: "看这一行", content: "`proxy_read_timeout 3s;` 就是那 3 分钟。" },
+		],
+		limitations: ["只解释 502，不覆盖 504", "假设上游没有主动返回错误"],
+		checks: [
+			{
+				id: "who-answers",
+				afterLayerId: "mechanism",
+				question: "这个 502 是谁生成的？",
+				choices: [
+					{ id: "upstream", label: "上游服务" },
+					{ id: "gateway", label: "网关" },
+					{ id: "client", label: "客户端" },
+				],
+				answerId: "gateway",
+			},
+		],
+		...overrides,
+	};
+}
+function codesOf(issues: Array<{ code: string }>): string[] {
+	return issues.map((issue) => issue.code);
+}
+
+test("explain: valid plan validates and normalizes", () => {
+	const v = validateExplanationPlan(explainPlan());
+	ok(v.valid, `expected valid, got ${JSON.stringify(v.errors)}`);
+	eq(v.plan?.layers.length, 4, "4 layers");
+	eq(v.plan?.checks?.[0].choices.length, 3, "3 choices");
+	eq(v.stats.contentChars > 0, true, "stats counted");
+});
+test("explain: fail-closed on the accuracy gates", () => {
+	const cases: Array<[string, unknown, string]> = [
+		["no limitations", explainPlan({ limitations: [] }), "limitations-count"],
+		["missing limitations", { ...(explainPlan() as object), limitations: undefined }, "limitations-required"],
+		["analogy without breakage", explainPlan({
+			layers: (explainPlan() as { layers: Array<Record<string, unknown>> }).layers.slice(0, 3).map((l) => ({ ...l, analogyBreakage: undefined })),
+		}), "analogy-breakage-required"],
+		["duplicate layer id", explainPlan({
+			layers: [
+				{ id: "core", kind: "core", title: "a", content: "x" },
+				{ id: "core", kind: "mechanism", title: "b", content: "y" },
+			],
+		}), "duplicate-layer-id"],
+		["check targets unknown layer", explainPlan({
+			checks: [{ id: "c", afterLayerId: "nope", question: "q", choices: [{ id: "a", label: "A" }, { id: "b", label: "B" }], answerId: "a" }],
+		}), "check-target-unknown"],
+		["answer not among choices", explainPlan({
+			checks: [{ id: "c", afterLayerId: "core", question: "q", choices: [{ id: "a", label: "A" }, { id: "b", label: "B" }], answerId: "zzz" }],
+		}), "check-answer-unknown"],
+		["too many layers", explainPlan({ layers: Array.from({ length: 7 }, (_, i) => ({ id: `l${i}`, kind: "core", title: `t${i}`, content: "x" })) }), "layers-count"],
+		["layer too long", explainPlan({ layers: [{ id: "core", kind: "core", title: "t", content: "y".repeat(1201) }] }), "layer-content"],
+		["wrong schema", explainPlan({ schema: "explain.ir/v0" }), "bad-schema"],
+		["bad audience", explainPlan({ audience: "child" }), "audience-enum"],
+	];
+	for (const [label, input, code] of cases) {
+		const v = validateExplanationPlan(input);
+		ok(!v.valid, `${label} must be rejected`);
+		ok(codesOf(v.errors).includes(code), `${label} → ${code}, got ${codesOf(v.errors).join(",")}`);
+		ok(v.plan === null, `${label} yields no plan`);
+	}
+});
+test("explain: JSON parse failure is an issue, not a throw", () => {
+	const v = parseExplanationPlan("{not json");
+	ok(!v.valid, "invalid json rejected");
+	eq(v.errors[0]?.code, "bad-json", "bad-json code");
+});
+test("explain: hollow analogy breakage and dense content warn only", () => {
+	const layers = (explainPlan() as { layers: Array<Record<string, unknown>> }).layers.map((l) =>
+		l.kind === "analogy" ? { ...l, analogyBreakage: "不完全准确" } : l,
+	);
+	const v = validateExplanationPlan(explainPlan({ layers }));
+	ok(v.valid, "still valid");
+	ok(codesOf(v.warnings).includes("analogy-breakage-vague"), "vague breakage flagged");
+});
+test("explain: markdown-lite blocks", () => {
+	const html = renderMarkdownLite("段落一\n\n- 甲\n- 乙\n\n1. 第一\n2. 第二\n\n```\nlet a = 1;\n```");
+	ok(html.includes("<p>段落一</p>"), "paragraph");
+	ok(html.includes("<ul><li>甲</li><li>乙</li></ul>"), "bullet list");
+	ok(html.includes("<ol><li>第一</li><li>第二</li></ol>"), "numbered list");
+	ok(html.includes('<pre class="code-block"><code>let a = 1;</code></pre>'), "fenced code");
+	ok(renderMarkdownLite("用 `x` 和 **粗**").includes("<code>x</code>"), "inline code");
+	ok(renderMarkdownLite("用 `x` 和 **粗**").includes("<strong>粗</strong>"), "inline bold");
+});
+test("explain: compiled fragment passes the governed report audit", () => {
+	const plan = validateExplanationPlan(explainPlan()).plan!;
+	const compiled = compileExplanation(plan);
+	const audit = auditReportContent(compiled.html);
+	eq(audit.errors.length, 0, `audit errors: ${JSON.stringify(audit.errors)}`);
+	eq(audit.warnings.length, 0, `audit warnings: ${JSON.stringify(audit.warnings)}`);
+	ok(compiled.html.includes('id="hero"'), "hero present");
+	ok(compiled.html.includes('id="layer-analogy"'), "stable layer anchor");
+	ok(compiled.html.includes('data-talk-event="explain-check"'), "quiz uses the existing bridge");
+	ok(!/answerId|data-correct/i.test(compiled.html), "the page never reveals the answer");
+	ok(compiled.html.trimEnd().endsWith("</div>"), "verdict is last");
+});
+test("explain: hostile layer text is escaped, not rejected", () => {
+	const plan = validateExplanationPlan(
+		explainPlan({
+			checks: undefined,
+			layers: [
+				{
+					id: "core",
+					kind: "core",
+					title: "讲 <script>alert(1)</script> 与 onclick=",
+					content: '危险写法是 <script>alert(1)</script>，以及 <img src=x onerror="pwn()">，javascript:alert(1)。',
+				},
+			],
+		}),
+	).plan!;;
+	const compiled = compileExplanation(plan);
+	ok(compiled.html.includes("&lt;script&gt;"), "script text is escaped");
+	ok(!compiled.html.includes("<script"), "no script element produced");
+	const audit = auditReportContent(compiled.html);
+	eq(audit.errors.length, 0, `escaped text still audits clean: ${JSON.stringify(audit.errors)}`);
+});
+test("explain: renders through the report pipeline end to end", async () => {
+	const rt = getRuntime();
+	await startSession("report", { title: "explain-e2e" }, rt);
+	const plan = validateExplanationPlan(explainPlan()).plan!;
+	const compiled = compileExplanation(plan);
+	const res = await renderTalk(
+		{ styleId: "report", content: compiled.html, meta: compiled.meta, title: plan.topic },
+		rt,
+	);
+	ok(res.ok, `render ok: ${res.message}`);
+	const audit = (res.details as { audit?: { errors: unknown[]; warnings: unknown[] } })?.audit;
+	eq(audit?.errors.length ?? -1, 0, "fragment + assembled report audit has zero errors");
+	await stopSession(rt);
+});
+
+test("explain: quiz answers ride the existing event bridge", async () => {
+	const rt = getRuntime();
+	await startSession("report", { title: "explain-quiz" }, rt);
+	const plan = validateExplanationPlan(explainPlan()).plan!;
+	const compiled = compileExplanation(plan);
+	const res = await renderTalk(
+		{ styleId: "report", content: compiled.html, meta: compiled.meta, title: plan.topic },
+		rt,
+	);
+	ok(res.ok, `render ok: ${res.message}`);
+	// Every choice button must carry a parsable checkId::choiceId that exists in the IR.
+	const pairs = [...compiled.html.matchAll(/data-talk-value="([^"]+)"/g)].map((m) => m[1]!);
+	eq(pairs.length, 3, "one value per declared choice");
+	for (const pair of pairs) {
+		const [checkId, choiceId] = pair.split("::");
+		const check = plan.checks?.find((c) => c.id === checkId);
+		ok(check, `check ${checkId} exists in the IR`);
+		ok(check!.choices.some((choice) => choice.id === choiceId), `choice ${pair} is declared`);
+	}
+	// The bridge delivers {id,text,value,href}; the agent judges correctness from the IR.
+	rt.server!.pushEvent({
+		type: "explain-check",
+		payload: { id: null, text: "网关", value: "who-answers::gateway", href: null },
+		source: "test",
+	});
+	const events = pollEvents(undefined, rt);
+	const answer = events.find((event) => event.type === "explain-check");
+	ok(answer, "explain-check delivered to the agent");
+	const value = String((answer!.payload as { value: string }).value);
+	const [checkId, choiceId] = value.split("::");
+	const check = plan.checks!.find((c) => c.id === checkId)!;
+	eq(choiceId === check.answerId, true, "agent-side judgement resolves the answer");
+	await stopSession(rt);
 });
 
 async function main(): Promise<void> {
