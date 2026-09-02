@@ -6,7 +6,7 @@ import { startTalkServer, injectBridge, getBridgeVersion, applyPatchToHtml, comp
 import { loadStyleRegistry, parseManifest, validateManifest, getStyleById } from "../registry";
 import { auditReportContent } from "../report-audit";
 import { parseExplanationPlan, validateExplanationPlan } from "../explain/validate";
-import { compileExplanation, renderMarkdownLite } from "../explain/render";
+import { compileExplanation, plainText, renderMarkdownLite, thesisOf } from "../explain/render";
 import { lintHtmlFragment } from "../lint";
 import { htmlToMarkdown, exportSurface } from "../export";
 import { resolveChrome, chromeCapture } from "../verify";
@@ -470,6 +470,7 @@ test("explain: valid plan validates and normalizes", () => {
 test("explain: fail-closed on the accuracy gates", () => {
 	const cases: Array<[string, unknown, string]> = [
 		["no limitations", explainPlan({ limitations: [] }), "limitations-count"],
+		["four limitations truncated", explainPlan({ limitations: ["一", "二", "三", "四"] }), "limitations-count"],
 		["missing limitations", { ...(explainPlan() as object), limitations: undefined }, "limitations-required"],
 		["analogy without breakage", explainPlan({
 			layers: (explainPlan() as { layers: Array<Record<string, unknown>> }).layers.slice(0, 3).map((l) => ({ ...l, analogyBreakage: undefined })),
@@ -490,6 +491,47 @@ test("explain: fail-closed on the accuracy gates", () => {
 		["layer too long", explainPlan({ layers: [{ id: "core", kind: "core", title: "t", content: "y".repeat(1201) }] }), "layer-content"],
 		["wrong schema", explainPlan({ schema: "explain.ir/v0" }), "bad-schema"],
 		["bad audience", explainPlan({ audience: "child" }), "audience-enum"],
+		// v1 (Sol review): identity is exact — no repair, no case-fold, no colon.
+		["repaired id rejected", explainPlan({
+			layers: [{ id: "Core Layer", kind: "core", title: "t", content: "x" }],
+		}), "layer-id"],
+		["colon id rejected", explainPlan({
+			layers: [{ id: "layer:1", kind: "core", title: "t", content: "x" }],
+		}), "layer-id"],
+		["oversize id rejected", explainPlan({
+			layers: [{ id: "x".repeat(65), kind: "core", title: "t", content: "x" }],
+		}), "layer-id"],
+		["exact reference required", explainPlan({
+			layers: [{ id: "Core", kind: "core", title: "t", content: "x" }],
+			checks: [{ id: "c1", afterLayerId: "core", question: "q", choices: [{ id: "a", label: "A" }, { id: "b", label: "B" }], answerId: "a" }],
+		}), "check-target-unknown"],
+		["check id with colon rejected", explainPlan({
+			checks: [{ id: "q::1", afterLayerId: "core", question: "q", choices: [{ id: "a", label: "A" }, { id: "b", label: "B" }], answerId: "a" }],
+		}), "check-id"],
+		// v1 (Sol review): closed schema — cut fields stay cut, loudly.
+		["unknown top-level field", explainPlan({ strategy: "socratic" }), "unknown-field"],
+		["unknown layer field", explainPlan({
+			layers: [{ id: "core", kind: "core", title: "t", content: "x", depth: 3 }],
+		}), "unknown-field"],
+		// v1 (Sol review): the one-sentence core is structural semantics.
+		["no core", explainPlan({
+			layers: [
+				{ id: "a", kind: "mechanism", title: "a", content: "x" },
+				{ id: "b", kind: "mechanism", title: "b", content: "y" },
+			],
+		}), "core-missing"],
+		["two cores", explainPlan({
+			layers: [
+				{ id: "a", kind: "core", title: "a", content: "x" },
+				{ id: "b", kind: "core", title: "b", content: "y" },
+			],
+		}), "core-count"],
+		["core not first", explainPlan({
+			layers: [
+				{ id: "a", kind: "mechanism", title: "a", content: "x" },
+				{ id: "b", kind: "core", title: "b", content: "y" },
+			],
+		}), "core-first"],
 	];
 	for (const [label, input, code] of cases) {
 		const v = validateExplanationPlan(input);
@@ -511,6 +553,22 @@ test("explain: hollow analogy breakage and dense content warn only", () => {
 	ok(v.valid, "still valid");
 	ok(codesOf(v.warnings).includes("analogy-breakage-vague"), "vague breakage flagged");
 });
+test("explain: plainText keeps technical characters (Sol probes)", () => {
+	eq(plainText("C# 比 C++ 更安全。后者更慢。"), "C# 比 C++ 更安全。后者更慢。", "C#/C++ survive");
+	eq(plainText("条件是 x > y。否则回退。"), "条件是 x > y。否则回退。", "comparison survives");
+	eq(plainText("用 snake_case 命名。"), "用 snake_case 命名。", "underscores survive");
+	eq(plainText("`foo_bar` 是变量。下一段。"), "foo_bar 是变量。下一段。", "code delimiters unwrap, content survives");
+	eq(plainText("**重点**在这里。其次。"), "重点在这里。其次。", "bold unwraps");
+	eq(plainText("## 标题\n第一句。第二句。"), "第一句。第二句。", "heading lines skipped");
+	eq(plainText("- 网关只等 3 秒\n- 上游 P99 是 4.1 秒"), "网关只等 3 秒 上游 P99 是 4.1 秒", "list markers strip, 4.1 intact");
+});
+test("explain: thesisOf extracts the first sentence without corrupting it (Sol P1-5)", () => {
+	eq(thesisOf("C# 比 C++ 更安全。后者更慢。"), "C# 比 C++ 更安全。", "CJK sentence split, C# intact");
+	eq(thesisOf("条件是 x > y。否则回退。"), "条件是 x > y。", "comparison intact");
+	eq(thesisOf("用 snake_case 命名。不要用驼峰。"), "用 snake_case 命名。", "underscores intact");
+	eq(thesisOf("版本是 3.4。注意回退。"), "版本是 3.4。", "decimal point is not a sentence break");
+	eq(thesisOf("What is 502? It is a gateway error."), "What is 502?", "latin sentence split");
+});
 test("explain: markdown-lite blocks", () => {
 	const html = renderMarkdownLite("段落一\n\n- 甲\n- 乙\n\n1. 第一\n2. 第二\n\n```\nlet a = 1;\n```");
 	ok(html.includes("<p>段落一</p>"), "paragraph");
@@ -519,6 +577,9 @@ test("explain: markdown-lite blocks", () => {
 	ok(html.includes('<pre class="code-block"><code>let a = 1;</code></pre>'), "fenced code");
 	ok(renderMarkdownLite("用 `x` 和 **粗**").includes("<code>x</code>"), "inline code");
 	ok(renderMarkdownLite("用 `x` 和 **粗**").includes("<strong>粗</strong>"), "inline bold");
+	const opaque = renderMarkdownLite("代码里的 `**x**` 与 **粗**");
+	ok(opaque.includes("<code>**x**</code>"), "markdown inside code span stays literal");
+	ok(!/<code><strong>/.test(opaque), "code span is opaque to bold");
 });
 test("explain: compiled fragment passes the governed report audit", () => {
 	const plan = validateExplanationPlan(explainPlan()).plan!;
@@ -531,6 +592,21 @@ test("explain: compiled fragment passes the governed report audit", () => {
 	ok(compiled.html.includes('data-talk-event="explain-check"'), "quiz uses the existing bridge");
 	ok(!/answerId|data-correct/i.test(compiled.html), "the page never reveals the answer");
 	ok(compiled.html.trimEnd().endsWith("</div>"), "verdict is last");
+});
+test("explain: checks render positionally after their layer (Sol P1-4)", () => {
+	const plan = validateExplanationPlan(explainPlan()).plan!;
+	const compiled = compileExplanation(plan);
+	const html = compiled.html;
+	const mechanism = html.indexOf('id="layer-mechanism"');
+	const analogy = html.indexOf('id="layer-analogy"');
+	const firstQuizButton = html.indexOf('data-talk-event="explain-check"');
+	ok(mechanism !== -1 && analogy !== -1 && firstQuizButton !== -1, "anchors exist");
+	ok(firstQuizButton > mechanism && firstQuizButton < analogy, `check sits after its layer (${mechanism} < ${firstQuizButton} < ${analogy})`);
+	ok(!html.includes('id="checks"'), "no detached #checks section");
+	// Wire format is unambiguous: ids may not contain ":", so split("::") is exact.
+	for (const pair of [...html.matchAll(/data-talk-value="([^"]+)"/g)].map((m) => m[1]!)) {
+		eq(pair.split("::").length, 2, `wire pair parses exactly once: ${pair}`);
+	}
 });
 test("explain: hostile layer text is escaped, not rejected", () => {
 	const plan = validateExplanationPlan(
@@ -586,17 +662,41 @@ test("explain: quiz answers ride the existing event bridge", async () => {
 		ok(check, `check ${checkId} exists in the IR`);
 		ok(check!.choices.some((choice) => choice.id === choiceId), `choice ${pair} is declared`);
 	}
-	// The bridge delivers {id,text,value,href}; the agent judges correctness from the IR.
-	rt.server!.pushEvent({
-		type: "explain-check",
-		payload: { id: null, text: "网关", value: "who-answers::gateway", href: null },
-		source: "test",
+	// Real round-trip (Sol review: pushEvent self-confirmation removed) — POST
+	// exactly the body the browser bridge sends for a click on the rendered
+	// button, through the same /api/event endpoint, then judge agent-side.
+	const clicked = pairs[1]!; // "who-answers::gateway"
+	const port = rt.server!.port;
+	const status = await new Promise<number>((resolve, reject) => {
+		const req = httpRequest(
+			{
+				host: "127.0.0.1",
+				port,
+				path: "/api/event",
+				method: "POST",
+				headers: { "content-type": "application/json" },
+			},
+			(response) => {
+				response.resume();
+				resolve(response.statusCode ?? 0);
+			},
+		);
+		req.on("error", reject);
+		req.end(
+			JSON.stringify({
+				type: "explain-check",
+				payload: { id: null, text: "网关", value: clicked, href: null },
+				source: "browser",
+				surface: "main",
+			}),
+		);
 	});
+	eq(status, 200, "/api/event accepted the click");
 	const events = pollEvents(undefined, rt);
 	const answer = events.find((event) => event.type === "explain-check");
 	ok(answer, "explain-check delivered to the agent");
-	const value = String((answer!.payload as { value: string }).value);
-	const [checkId, choiceId] = value.split("::");
+	eq(String((answer!.payload as { value: string }).value), clicked, "value round-trips verbatim");
+	const [checkId, choiceId] = String((answer!.payload as { value: string }).value).split("::");
 	const check = plan.checks!.find((c) => c.id === checkId)!;
 	eq(choiceId === check.answerId, true, "agent-side judgement resolves the answer");
 	await stopSession(rt);

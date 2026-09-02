@@ -18,14 +18,14 @@ the IR — not IR semantics.
   topic: string,                    // 1..120
   audience: "beginner" | "intermediate" | "expert",
   layers: [{                        // 1..6, ordered shallow → deep
-    id: string,                     // stable ASCII token → #layer-<id>, learner-state key
+    id: string,                     // ^[A-Za-z][A-Za-z0-9_.-]*$, ≤64, EXACT match (no repair, no ":")
     kind: "core" | "mechanism" | "example" | "code" | "analogy",
     title: string,                  // 1..60
     content: string,                // 1..1200, markdown-lite, escaped never parsed as HTML
     analogyBreakage?: string,       // REQUIRED iff kind === "analogy" (≤300)
-  }],
-  limitations: string[],            // 1..3 × ≤200 — where the simplification stops being true
-  checks?: [{                       // 0..2
+  }],                               // exactly one kind:"core", and it must be layers[0]
+  limitations: string[],            // 1..3 × ≤200 — hard-fail outside the bound, never truncated
+  checks?: [{                       // 0..2; rendered immediately after afterLayerId's section
     id: string, afterLayerId: string, question: string,
     choices: [{ id, label }],       // 2..4
     answerId: string,               // judged agent-side; never rendered into the DOM
@@ -33,13 +33,19 @@ the IR — not IR semantics.
 }
 ```
 
-Hard gates (render nothing): schema mismatch, missing/empty fields, bounds, enums,
-duplicate or unstable ids, missing `limitations`, analogy layer without
-`analogyBreakage`, check referencing an unknown layer or an unknown answer.
+The schema is **closed** (v1, Sol review): unknown keys on plan/layer/check/choice
+are errors, so cut fields stay cut loudly. Ids reject `:` because the quiz wire
+format concatenates `checkId::choiceId` — that split must stay unambiguous.
+References (`afterLayerId`, `answerId`) must match authored tokens exactly.
+
+Hard gates (render nothing): schema mismatch, unknown fields, missing/empty fields,
+bounds, enums, duplicate/unstable/repaired ids, missing `limitations` or >3, analogy
+layer without `analogyBreakage`, check referencing an unknown layer or an unknown
+answer, zero/multiple `core` layers, core not first.
 
 Warnings (render anyway): dense layer (>900 chars), >4 layers, duplicate titles,
-`core` not first, beginner plan without analogy or without a check, hollow
-`analogyBreakage` boilerplate ("不完全准确" with nothing concrete).
+beginner plan without analogy or without a check, hollow `analogyBreakage`
+boilerplate ("不完全准确" with nothing concrete).
 
 ## Anti-wrong-simplification mechanism
 
@@ -59,7 +65,10 @@ remediation are decided by the agent from the IR it holds.
 Rules that keep Phase 3 from forcing an IR break:
 
 - learner results live in a separate `explain.state/v1` object, never written back into
-  a plan; key it by `talkSessionId + surfaceId + layerId/checkId`;
+  a plan; key it by `talkSessionId + surfaceId + layerId/checkId` **plus a
+  plan/check content digest** — a full re-render may keep `check.id` while changing
+  question/choices/answer, and the digest is what prevents stale answers attaching to
+  new semantics (`choice.id` lifecycle is part of the same contract);
 - only stable `layer.id` / `check.id` are reserved now;
 - after an answer, re-render the full plan (patching a governed report bypasses its
   audit);
@@ -70,8 +79,10 @@ Rules that keep Phase 3 from forcing an IR break:
 
 `talk_explain({ planJson, title?, open?, verify? })` — the tool validates, compiles and
 renders in one call and returns the IR validation plus the report audit in `details`.
-Hand-rolled `talk_render({styleId:"report"})` for the same content is possible but
-unvalidated; use it only for debugging.
+Report audit/CSP/export are inherited and blocking; **visual verification is opt-in**
+(`verify: true`, or a separate `talk_verify` call) — a screenshot failure does not flip
+the render's top-level `ok`. Hand-rolled `talk_render({styleId:"report"})` for the same
+content is possible but unvalidated; use it only for debugging.
 
 ## 砍掉的东西 (and why)
 

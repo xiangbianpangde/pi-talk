@@ -20,6 +20,7 @@ import {
 	EXPLAIN_AUDIENCE_LABEL,
 	EXPLAIN_KIND_LABEL,
 	type ExplanationPlan,
+	type UnderstandingCheck,
 } from "./types";
 
 export interface CompiledExplanation {
@@ -38,11 +39,17 @@ function escapeHtml(value: string): string {
 		.replace(/'/g, "&#39;");
 }
 
-/** Inline subset on already-escaped text: `code` and **bold** only. */
+/** Inline subset on already-escaped text: `code` and **bold** only.
+ * Code spans are made opaque first (P3, Sol review): markdown inside a code
+ * span — e.g. `**x**` — stays literal instead of being bolded. */
 function inlineMarkdown(escaped: string): string {
-	return escaped
-		.replace(/`([^`\n]+)`/g, (_m, code: string) => `<code>${code}</code>`)
-		.replace(/\*\*([^*\n]+)\*\*/g, (_m, strong: string) => `<strong>${strong}</strong>`);
+	const codeSpans: string[] = [];
+	const masked = escaped.replace(/`([^`\n]+)`/g, (_m, code: string) => {
+		codeSpans.push(`<code>${code}</code>`);
+		return `\u0000${codeSpans.length - 1}\u0000`;
+	});
+	const bolded = masked.replace(/\*\*([^*\n]+)\*\*/g, (_m, strong: string) => `<strong>${strong}</strong>`);
+	return bolded.replace(/\u0000(\d+)\u0000/g, (_m, index: string) => codeSpans[Number(index)] ?? "");
 }
 
 /**
@@ -117,10 +124,38 @@ export function renderMarkdownLite(source: string): string {
 	return out.join("\n");
 }
 
-/** First sentence of the core layer, used as the hero thesis and the verdict. */
-function thesisOf(core: string): string {
-	const flat = core.replace(/```[\s\S]*?```/g, " ").replace(/[#*`>_]/g, "").replace(/\s+/g, " ").trim();
-	const sentence = flat.split(/(?<=[。！？!?.])\s/)[0] ?? flat;
+/**
+ * Markdown-lite → plain text WITHOUT destroying technical characters
+ * (v1 fix, Sol review: the old regex deleted # _ > globally, turning C# into C,
+ * x > y into x y, snake_case into snakecase).
+ *
+ * Only paired delimiters are unwrapped (`code`, **bold**); fenced blocks are
+ * dropped (code is rarely thesis material); line-leading markers are removed
+ * and heading lines skipped. Ordinary prose keeps every character.
+ */
+export function plainText(source: string): string {
+	const withoutFences = source
+		.replace(/```[\s\S]*?```/g, " ")
+		.replace(/`([^`]*)`/g, "$1")
+		.replace(/\*\*(.+?)\*\*/g, "$1");
+	const proseLines: string[] = [];
+	for (const rawLine of withoutFences.split("\n")) {
+		const line = rawLine.trim();
+		if (!line) continue;
+		if (/^#{1,6}\s/.test(line)) continue; // heading line: not thesis material
+		proseLines.push(line.replace(/^(?:[-*+]|\d+[.)])\s+/, ""));
+	}
+	return proseLines.join(" ").replace(/\s+/g, " ").trim();
+}
+
+/**
+ * First sentence of the core layer, used as the hero thesis and the verdict.
+ * CJK terminators split without trailing whitespace; Latin .?! requires
+ * whitespace so "3.4 秒" and "e.g." stay intact.
+ */
+export function thesisOf(core: string): string {
+	const flat = plainText(core);
+	const sentence = flat.split(/(?<=[。！？!?])|(?<=[.?!])\s+/)[0] ?? flat;
 	return sentence.length > 140 ? `${sentence.slice(0, 139)}…` : sentence;
 }
 
@@ -133,7 +168,38 @@ export function compileExplanation(plan: ExplanationPlan): CompiledExplanation {
 	const parts: string[] = [];
 	const core = plan.layers.find((layer) => layer.kind === "core") ?? plan.layers[0];
 	const thesis = thesisOf(core.content);
-	const layerTitle = new Map(plan.layers.map((layer) => [layer.id, layer.title]));
+	// v1 fix (Sol review): afterLayerId is positional — each check renders
+	// immediately after its target layer, not in a detached section.
+	const checksByLayer = new Map<string, UnderstandingCheck[]>();
+	for (const check of plan.checks ?? []) {
+		const list = checksByLayer.get(check.afterLayerId) ?? [];
+		list.push(check);
+		checksByLayer.set(check.afterLayerId, list);
+	}
+	const renderCheckCards = (layerId: string): string => {
+		const checks = checksByLayer.get(layerId);
+		if (!checks?.length) return "";
+		const cards = checks
+			.map((check) => {
+				const buttons = check.choices
+					.map(
+						(choice) =>
+							`<button type="button" data-talk-event="explain-check" data-talk-value="${escapeHtml(
+								`${check.id}::${choice.id}`,
+							)}">${escapeHtml(choice.label)}</button>`,
+					)
+					.join("");
+				return [
+					`<article class="card hl">`,
+					`<h3>${escapeHtml(check.question)}</h3>`,
+					`<p class="text-small text-faint">选一个；答案由 agent 侧判断，页面不替你宣布对错。</p>`,
+					`<div class="actions">${buttons}</div>`,
+					`</article>`,
+				].join("");
+			})
+			.join("");
+		return checks.length > 1 ? `<div class="grid g2 mt-1">${cards}</div>` : `<div class="mt-1">${cards}</div>`;
+	};
 
 	parts.push(
 		`<section id="hero" class="hero" data-nav-title="解释">`,
@@ -162,8 +228,8 @@ export function compileExplanation(plan: ExplanationPlan): CompiledExplanation {
 		}
 		const disclosure =
 			index === 0
-				? `<div class="mt-1">${body}${inner.join("")}</div>`
-				: `<details class="hook"><summary>展开完整说明</summary><div class="body">${body}${inner.join("")}</div></details>`;
+				? `<div class="mt-1">${body}${inner.join("")}</div>${renderCheckCards(layer.id)}`
+				: `<details class="hook"><summary>展开完整说明</summary><div class="body">${body}${inner.join("")}</div></details>${renderCheckCards(layer.id)}`;
 		parts.push(
 			`<section id="layer-${escapeHtml(layer.id)}" class="sec-head section-gap" data-nav-title="${escapeHtml(layer.title)}">`,
 			`<div class="tag">${String(index + 1).padStart(2, "0")} · ${escapeHtml(EXPLAIN_KIND_LABEL[layer.kind])}</div>`,
@@ -187,44 +253,13 @@ export function compileExplanation(plan: ExplanationPlan): CompiledExplanation {
 		`</section>`,
 	);
 
-	if (plan.checks?.length) {
-		const cards = plan.checks
-			.map((check) => {
-				const buttons = check.choices
-					.map(
-						(choice) =>
-							`<button type="button" data-talk-event="explain-check" data-talk-value="${escapeHtml(
-								`${check.id}::${choice.id}`,
-							)}">${escapeHtml(choice.label)}</button>`,
-					)
-					.join("");
-				const target = layerTitle.get(check.afterLayerId);
-				return [
-					`<article class="card hl">`,
-					`<h3>${escapeHtml(check.question)}</h3>`,
-					`<p class="text-small text-faint">对应层：${escapeHtml(target ?? check.afterLayerId)}</p>`,
-					`<div class="actions">${buttons}</div>`,
-					`</article>`,
-				].join("");
-			})
-			.join("");
-		parts.push(
-			`<section id="checks" class="sec-head section-gap" data-nav-title="理解检查">`,
-			`<div class="tag">Q · CHECK</div>`,
-			`<h2>理解检查</h2>`,
-			`<p class="text-small text-faint">选一个，答案与下一步由 agent 侧判断，页面不替你宣布对错。</p>`,
-			`<div class="grid g2">${cards}</div>`,
-			`</section>`,
-		);
-	}
-
 	parts.push(
 		`<div class="verdict">`,
 		`<div class="lbl">记住这一句</div>`,
 		`<h3>${inlineMarkdown(escapeHtml(thesis))}</h3>`,
 		`<p>${
 			plan.checks?.length
-				? "先做上面的理解检查；不对就说「哪一层没懂」，我会重讲那一层而不是重讲全部。"
+				? "每层下面的理解检查答错了，就告诉我哪一层没懂——我会重讲那一层而不是重讲全部。"
 				: "想再深一层就点名要哪一层（机制 / 例子 / 代码 / 边界），我会重讲那一层而不是重讲全部。"
 		}</p>`,
 		`</div>`,
@@ -240,6 +275,6 @@ export function compileExplanation(plan: ExplanationPlan): CompiledExplanation {
 				plan.checks?.length ? ` · ${plan.checks.length} 个检查` : ""
 			}`,
 		},
-		sections: plan.layers.length + 1 + (plan.checks?.length ? 1 : 0),
+		sections: plan.layers.length + 1,
 	};
 }

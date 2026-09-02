@@ -29,14 +29,15 @@ export interface ExplanationLayer {
 	/** Required iff kind === "analogy": where the analogy stops holding. */
 	analogyBreakage?: string;
 }
-
 export interface ExplainChoice {
 	id: string;
 	label: string;
 }
 
 /**
- * Understanding check. The client reports only *what was chosen*
+ * Understanding check. `afterLayerId` is POSITIONAL: the compiler renders the
+ * check card immediately after its target layer (v1 fix, Sol review) — it is
+ * not an annotation. The client reports only *what was chosen*
  * (`explain-check` → `checkId::choiceId`); correctness is judged agent-side so
  * the page never declares the learner right on its own behalf.
  */
@@ -52,7 +53,7 @@ export interface ExplanationPlan {
 	schema: typeof EXPLAIN_IR_SCHEMA;
 	topic: string;
 	audience: ExplainAudience;
-	/** Ordered shallow → deep. layers[0] is the one-sentence core. */
+	/** Ordered shallow → deep. layers[0] must be the single one-sentence core (enforced). */
 	layers: ExplanationLayer[];
 	/** Where this simplification stops being true. 1–3, never optional. */
 	limitations: string[];
@@ -72,6 +73,8 @@ export const EXPLAIN_LIMITS = {
 	topicMax: 120,
 	layerMin: 1,
 	layerMax: 6,
+	/** Stable-id max length; ids are validated exactly as authored (v1). */
+	idMax: 64,
 	layerTitleMax: 60,
 	layerContentMax: 1200,
 	/** Compiler warns above this: an ELI5 layer that needs scrolling is not ELI5. */

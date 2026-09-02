@@ -35,8 +35,16 @@ export interface ExplainValidation {
 	stats: { layers: number; limitations: number; checks: number; contentChars: number };
 }
 
-/** Same token grammar the report auditor accepts for element ids. */
-const ID_RE = /^[A-Za-z][A-Za-z0-9_.:-]*$/;
+/**
+ * Identity grammar for layer/check ids (and references to them).
+ * v1 fix (Sol review): ids are validated EXACTLY as authored — no lowercasing,
+ * no character repair, no prefix mending. A rewritten id would desynchronize
+ * producer identity from stored identity, and these ids are the join keys for
+ * future learner state (explain.state/v1). `:` is excluded because the quiz
+ * wire format concatenates `checkId::choiceId`.
+ */
+const ID_RE = /^[A-Za-z][A-Za-z0-9_.-]*$/;
+const ID_MAX = 64;
 
 /**
  * Boilerplate that lets a model satisfy "analogyBreakage" without thinking.
@@ -66,16 +74,36 @@ function trimmed(value: unknown): string | null {
 	return out.length ? out : null;
 }
 
-function normalizeId(raw: string): string {
-	return raw
-		.toLowerCase()
-		.replace(/[^a-z0-9_.:-]+/g, "-")
-		.replace(/^-+|-+$/g, "")
-		.replace(/^(\d)/, "l$1");
-}
-
 function layerKindLabel(kind: string): string {
 	return kind;
+}
+
+/**
+ * Closed schema (v1 fix, Sol review): unknown keys are rejected so producers
+ * learn immediately that a field is not part of explain.ir/v1 instead of
+ * watching it silently disappear. Keyed by object role.
+ */
+const ALLOWED_PLAN_KEYS = new Set(["schema", "topic", "audience", "layers", "limitations", "checks"]);
+const ALLOWED_LAYER_KEYS = new Set(["id", "kind", "title", "content", "analogyBreakage"]);
+const ALLOWED_CHECK_KEYS = new Set(["id", "afterLayerId", "question", "choices", "answerId"]);
+const ALLOWED_CHOICE_KEYS = new Set(["id", "label"]);
+
+function rejectUnknownKeys(
+	input: Record<string, unknown>,
+	allowed: Set<string>,
+	path: string,
+	push: (severity: ExplainIssue["severity"], code: string, message: string, path?: string) => void,
+): void {
+	for (const key of Object.keys(input)) {
+		if (!allowed.has(key)) {
+			push(
+				"error",
+				"unknown-field",
+				`${path}.${key} is not part of explain.ir/v1 (allowed: ${[...allowed].join(", ")}).`,
+				`${path}.${key}`,
+			);
+		}
+	}
 }
 
 /** Validate an unknown value (already parsed JSON) as an ExplanationPlan. */
@@ -118,6 +146,7 @@ export function validateExplanationPlan(input: unknown): ExplainValidation {
 
 	const topic = trimmed(input.topic);
 	if (!topic) return fail("missing-field", "topic is required and must be a non-empty string.", "topic");
+	rejectUnknownKeys(input, ALLOWED_PLAN_KEYS, "plan", push);
 	if (topic.length > EXPLAIN_LIMITS.topicMax) {
 		return fail(
 			"topic-too-long",
@@ -157,13 +186,13 @@ export function validateExplanationPlan(input: unknown): ExplainValidation {
 			push("error", "layer-shape", `${path} must be an object.`, path);
 			continue;
 		}
-		const rawId = trimmed(raw.id) ?? "";
-		const id = normalizeId(rawId);
-		if (!id || !ID_RE.test(id)) {
+		rejectUnknownKeys(raw, ALLOWED_LAYER_KEYS, path, push);
+		const id = trimmed(raw.id) ?? "";
+		if (!id || !ID_RE.test(id) || id.length > ID_MAX) {
 			push(
 				"error",
 				"layer-id",
-				`${path}.id is required and must be a stable ASCII token like "cache-hit" (matches ${ID_RE}).`,
+				`${path}.id is required: an ASCII token matching /^[A-Za-z][A-Za-z0-9_.-]*$/ (no ":", max ${ID_MAX} chars), validated exactly as authored — "Core Layer" stays invalid and is never repaired.`,
 				`${path}.id`,
 			);
 		} else if (layerIds.has(id)) {
@@ -280,13 +309,18 @@ export function validateExplanationPlan(input: unknown): ExplainValidation {
 	for (const [title, count] of titles) {
 		if (count > 1) push("warning", "duplicate-title", `"${title}" is used by ${count} layers.`, "layers");
 	}
-	if (layers[0] && layers[0].kind !== "core") {
-		push(
-			"warning",
-			"core-not-first",
-			`layers[0].kind is "${layers[0].kind}"; the first layer should be the one-sentence core.`,
-			"layers",
-		);
+	// v1 fix (Sol review): "layers[0] is the one-sentence core" is structural
+	// semantics, not advice — types.ts, the tool description and the skill all
+	// promise it, so the validator enforces it.
+	const coreCount = layers.filter((layer) => layer.kind === "core").length;
+	if (coreCount === 0) {
+		return fail("core-missing", "No layer has kind \"core\"; every explanation needs exactly one one-sentence core.", "layers");
+	}
+	if (coreCount > 1) {
+		return fail("core-count", `Found ${coreCount} layers with kind "core"; exactly one is allowed.`, "layers");
+	}
+	if (layers[0]!.kind !== "core") {
+		return fail("core-first", `layers[0].kind is "${layers[0]!.kind}"; the one-sentence core must be the first layer.`, "layers");
 	}
 	if (audience === "beginner" && !layers.some((layer) => layer.kind === "analogy")) {
 		push("warning", "no-analogy", "audience is beginner but no layer uses kind=\"analogy\".", "layers");
@@ -296,6 +330,18 @@ export function validateExplanationPlan(input: unknown): ExplainValidation {
 		return fail(
 			"limitations-required",
 			"limitations is mandatory: name where this explanation stops being true (1–3 items).",
+			"limitations",
+		);
+	}
+	// v1 fix (Sol review): the 1–3 bound is structural and fail-closed. Boundaries
+	// and precision limits are exactly the content a silent truncation would drop.
+	if (
+		input.limitations.length < EXPLAIN_LIMITS.limitationMin ||
+		input.limitations.length > EXPLAIN_LIMITS.limitationMax
+	) {
+		return fail(
+			"limitations-count",
+			`limitations must number ${EXPLAIN_LIMITS.limitationMin}–${EXPLAIN_LIMITS.limitationMax} (got ${input.limitations.length}); nothing is silently dropped.`,
 			"limitations",
 		);
 	}
@@ -321,14 +367,6 @@ export function validateExplanationPlan(input: unknown): ExplainValidation {
 	if (limitations.length < EXPLAIN_LIMITS.limitationMin) {
 		return fail("limitations-count", "limitations needs at least one concrete item.", "limitations");
 	}
-	if (limitations.length > EXPLAIN_LIMITS.limitationMax) {
-		push(
-			"warning",
-			"limitations-count",
-			`${limitations.length} limitations; only the first ${EXPLAIN_LIMITS.limitationMax} are kept.`,
-			"limitations",
-		);
-	}
 
 	const checks: UnderstandingCheck[] = [];
 	if (input.checks !== undefined && input.checks !== null) {
@@ -351,9 +389,10 @@ export function validateExplanationPlan(input: unknown): ExplainValidation {
 					push("error", "checks-shape", `${path} must be an object.`, path);
 					continue;
 				}
-				const id = normalizeId(trimmed(raw.id) ?? "");
-				if (!id || !ID_RE.test(id)) {
-					push("error", "check-id", `${path}.id must be a stable ASCII token.`, `${path}.id`);
+				rejectUnknownKeys(raw, ALLOWED_CHECK_KEYS, path, push);
+				const id = trimmed(raw.id) ?? "";
+				if (!id || !ID_RE.test(id) || id.length > ID_MAX) {
+					push("error", "check-id", `${path}.id must match /^[A-Za-z][A-Za-z0-9_.-]*$/ (no ":", max ${ID_MAX}), exactly as authored.`, `${path}.id`);
 					continue;
 				}
 				if (checkIds.has(id) || layerIds.has(id)) {
@@ -367,12 +406,12 @@ export function validateExplanationPlan(input: unknown): ExplainValidation {
 					push("error", "check-question", `${path}.question must be 1–${EXPLAIN_LIMITS.questionMax} chars.`, `${path}.question`);
 					continue;
 				}
-				const afterLayerId = normalizeId(trimmed(raw.afterLayerId) ?? "");
+				const afterLayerId = trimmed(raw.afterLayerId) ?? "";
 				if (!layerIds.has(afterLayerId)) {
 					push(
 						"error",
 						"check-target-unknown",
-						`${path}.afterLayerId "${afterLayerId}" does not match any layer id.`,
+						`${path}.afterLayerId "${afterLayerId}" does not exactly match any layer id (references are token-exact, never normalized).`,
 						`${path}.afterLayerId`,
 					);
 					continue;
@@ -404,10 +443,11 @@ export function validateExplanationPlan(input: unknown): ExplainValidation {
 						choicesOk = false;
 						break;
 					}
-					const cid = normalizeId(trimmed(choice.id) ?? "");
+					rejectUnknownKeys(choice, ALLOWED_CHOICE_KEYS, cpath, push);
+					const cid = trimmed(choice.id) ?? "";
 					const label = trimmed(choice.label);
-					if (!cid || !ID_RE.test(cid) || choiceIds.has(cid)) {
-						push("error", "choice-id", `${cpath}.id must be a unique stable token.`, `${cpath}.id`);
+					if (!cid || !ID_RE.test(cid) || cid.length > ID_MAX || choiceIds.has(cid)) {
+						push("error", "choice-id", `${cpath}.id must be a unique token matching /^[A-Za-z][A-Za-z0-9_.-]*$/ (no ":").`, `${cpath}.id`);
 						choicesOk = false;
 						break;
 					}
@@ -425,7 +465,7 @@ export function validateExplanationPlan(input: unknown): ExplainValidation {
 					choices.push({ id: cid, label });
 				}
 				if (!choicesOk) continue;
-				const answerId = normalizeId(trimmed(raw.answerId) ?? "");
+				const answerId = trimmed(raw.answerId) ?? "";
 				if (!choiceIds.has(answerId)) {
 					push(
 						"error",
@@ -456,7 +496,7 @@ export function validateExplanationPlan(input: unknown): ExplainValidation {
 						topic,
 						audience: audience as ExplanationPlan["audience"],
 						layers,
-						limitations: limitations.slice(0, EXPLAIN_LIMITS.limitationMax),
+						limitations,
 						...(checks.length ? { checks } : {}),
 					}
 				: null,
