@@ -150,12 +150,13 @@ export function plainText(source: string): string {
 
 /**
  * First sentence of the core layer, used as the hero thesis and the verdict.
- * CJK terminators split without trailing whitespace; Latin .?! requires
- * whitespace so "3.4 秒" and "e.g." stay intact.
+ * Only fullwidth CJK terminators split without trailing whitespace; ASCII
+ * .?! require following whitespace so URLs (…search?q=x。), ternaries
+ * (ready?next:value) and x!.y survive intact (v1 fix, Sol round-3).
  */
 export function thesisOf(core: string): string {
 	const flat = plainText(core);
-	const sentence = flat.split(/(?<=[。！？!?])|(?<=[.?!])\s+/)[0] ?? flat;
+	const sentence = flat.split(/(?<=[。！？])|(?<=[.?!])\s+/)[0] ?? flat;
 	return sentence.length > 140 ? `${sentence.slice(0, 139)}…` : sentence;
 }
 

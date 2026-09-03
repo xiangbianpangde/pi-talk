@@ -568,6 +568,10 @@ test("explain: thesisOf extracts the first sentence without corrupting it (Sol P
 	eq(thesisOf("用 snake_case 命名。不要用驼峰。"), "用 snake_case 命名。", "underscores intact");
 	eq(thesisOf("版本是 3.4。注意回退。"), "版本是 3.4。", "decimal point is not a sentence break");
 	eq(thesisOf("What is 502? It is a gateway error."), "What is 502?", "latin sentence split");
+	// Sol round-3 probes: ASCII !/? must NOT split without whitespace.
+	eq(thesisOf("URL 是 https://api.test/search?q=x。然后回退。"), "URL 是 https://api.test/search?q=x。", "URL with query survives");
+	eq(thesisOf("表达式 ready?next:value 很常见。其次。"), "表达式 ready?next:value 很常见。", "ternary survives");
+	eq(thesisOf("断言 x!.y 是 TS 语法。其次。"), "断言 x!.y 是 TS 语法。", "non-split !. survives");
 });
 test("explain: markdown-lite blocks", () => {
 	const html = renderMarkdownLite("段落一\n\n- 甲\n- 乙\n\n1. 第一\n2. 第二\n\n```\nlet a = 1;\n```");
@@ -662,10 +666,31 @@ test("explain: quiz answers ride the existing event bridge", async () => {
 		ok(check, `check ${checkId} exists in the IR`);
 		ok(check!.choices.some((choice) => choice.id === choiceId), `choice ${pair} is declared`);
 	}
-	// Real round-trip (Sol review: pushEvent self-confirmation removed) — POST
-	// exactly the body the browser bridge sends for a click on the rendered
-	// button, through the same /api/event endpoint, then judge agent-side.
-	const clicked = pairs[1]!; // "who-answers::gateway"
+	// Round-trip (Sol round-3): the JSON body is now DERIVED from the compiled
+	// page, not hand-written — pick the first [data-talk-event="explain-check"]
+	// button out of the rendered HTML and send what the bridge's click
+	// delegation would send, with the bridge's real source tag
+	// (server.ts talkSend uses source:"talk-bridge"). This covers the
+	// /api/event endpoint, persistence and agent-side judgement; the browser
+	// click-delegation step itself remains browser-QA territory (chromeCapture
+	// cannot click) and is asserted separately below by anatomy.
+	const buttonPattern =
+		/<button[^>]*data-talk-event="explain-check"[^>]*data-talk-value="([^"]+)"[^>]*>([\s\S]*?)<\/button>/g;
+	const buttons = [...compiled.html.matchAll(buttonPattern)].map((m) => ({
+		value: m[1]!,
+		label: m[2]!.replace(/<[^>]+>/g, "").trim(),
+	}));
+	ok(buttons.length >= 3, "choice buttons found in the compiled page");
+	// Deliberately click the correct choice (agent knows the IR; a real learner
+	// could click any). Payload stays derived from the rendered DOM.
+	const correct = buttons.find((b) => {
+		const [checkId, choiceId] = b.value.split("::");
+		const check = plan.checks!.find((c) => c.id === checkId)!;
+		return check.answerId === choiceId;
+	});
+	ok(correct, "the correct choice exists as a rendered button");
+	const clicked = correct!.value;
+	const clickedLabel = correct!.label;
 	const port = rt.server!.port;
 	const status = await new Promise<number>((resolve, reject) => {
 		const req = httpRequest(
@@ -685,8 +710,8 @@ test("explain: quiz answers ride the existing event bridge", async () => {
 		req.end(
 			JSON.stringify({
 				type: "explain-check",
-				payload: { id: null, text: "网关", value: clicked, href: null },
-				source: "browser",
+				payload: { id: null, text: clickedLabel.slice(0, 200), value: clicked, href: null },
+				source: "talk-bridge",
 				surface: "main",
 			}),
 		);
@@ -695,7 +720,8 @@ test("explain: quiz answers ride the existing event bridge", async () => {
 	const events = pollEvents(undefined, rt);
 	const answer = events.find((event) => event.type === "explain-check");
 	ok(answer, "explain-check delivered to the agent");
-	eq(String((answer!.payload as { value: string }).value), clicked, "value round-trips verbatim");
+	eq(answer!.source, "talk-bridge", "event carries the real bridge source tag");
+	eq(String((answer!.payload as { value: string }).value), clicked, "value round-trips verbatim from the rendered button");
 	const [checkId, choiceId] = String((answer!.payload as { value: string }).value).split("::");
 	const check = plan.checks!.find((c) => c.id === checkId)!;
 	eq(choiceId === check.answerId, true, "agent-side judgement resolves the answer");

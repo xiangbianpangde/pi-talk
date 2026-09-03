@@ -74,6 +74,15 @@ function trimmed(value: unknown): string | null {
 	return out.length ? out : null;
 }
 
+/**
+ * v1 fix, Sol round-3: identity is never repaired — and never trimmed.
+ * trimmed() would silently turn " core " into "core"; ids and references
+ * must pass exactly as authored or fail. Prose fields keep trimmed().
+ */
+function exactId(value: unknown): string {
+	return typeof value === "string" ? value : "";
+}
+
 function layerKindLabel(kind: string): string {
 	return kind;
 }
@@ -187,12 +196,12 @@ export function validateExplanationPlan(input: unknown): ExplainValidation {
 			continue;
 		}
 		rejectUnknownKeys(raw, ALLOWED_LAYER_KEYS, path, push);
-		const id = trimmed(raw.id) ?? "";
+		const id = exactId(raw.id);
 		if (!id || !ID_RE.test(id) || id.length > ID_MAX) {
 			push(
 				"error",
 				"layer-id",
-				`${path}.id is required: an ASCII token matching /^[A-Za-z][A-Za-z0-9_.-]*$/ (no ":", max ${ID_MAX} chars), validated exactly as authored — "Core Layer" stays invalid and is never repaired.`,
+				`${path}.id is required: an ASCII token matching /^[A-Za-z][A-Za-z0-9_.-]*$/ (no ":", max ${ID_MAX} chars), validated exactly as authored — "Core Layer" and " core " are rejected, never repaired or trimmed.`,
 				`${path}.id`,
 			);
 		} else if (layerIds.has(id)) {
@@ -390,9 +399,9 @@ export function validateExplanationPlan(input: unknown): ExplainValidation {
 					continue;
 				}
 				rejectUnknownKeys(raw, ALLOWED_CHECK_KEYS, path, push);
-				const id = trimmed(raw.id) ?? "";
+				const id = exactId(raw.id);
 				if (!id || !ID_RE.test(id) || id.length > ID_MAX) {
-					push("error", "check-id", `${path}.id must match /^[A-Za-z][A-Za-z0-9_.-]*$/ (no ":", max ${ID_MAX}), exactly as authored.`, `${path}.id`);
+					push("error", "check-id", `${path}.id must match /^[A-Za-z][A-Za-z0-9_.-]*$/ (no ":", max ${ID_MAX}, no surrounding whitespace), exactly as authored.`, `${path}.id`);
 					continue;
 				}
 				if (checkIds.has(id) || layerIds.has(id)) {
@@ -406,12 +415,12 @@ export function validateExplanationPlan(input: unknown): ExplainValidation {
 					push("error", "check-question", `${path}.question must be 1–${EXPLAIN_LIMITS.questionMax} chars.`, `${path}.question`);
 					continue;
 				}
-				const afterLayerId = trimmed(raw.afterLayerId) ?? "";
+				const afterLayerId = exactId(raw.afterLayerId);
 				if (!layerIds.has(afterLayerId)) {
 					push(
 						"error",
 						"check-target-unknown",
-						`${path}.afterLayerId "${afterLayerId}" does not exactly match any layer id (references are token-exact, never normalized).`,
+						`${path}.afterLayerId "${afterLayerId}" does not exactly match any layer id (references are token-exact, never normalized or trimmed).`,
 						`${path}.afterLayerId`,
 					);
 					continue;
@@ -444,10 +453,10 @@ export function validateExplanationPlan(input: unknown): ExplainValidation {
 						break;
 					}
 					rejectUnknownKeys(choice, ALLOWED_CHOICE_KEYS, cpath, push);
-					const cid = trimmed(choice.id) ?? "";
+					const cid = exactId(choice.id);
 					const label = trimmed(choice.label);
 					if (!cid || !ID_RE.test(cid) || cid.length > ID_MAX || choiceIds.has(cid)) {
-						push("error", "choice-id", `${cpath}.id must be a unique token matching /^[A-Za-z][A-Za-z0-9_.-]*$/ (no ":").`, `${cpath}.id`);
+						push("error", "choice-id", `${cpath}.id must be a unique token matching /^[A-Za-z][A-Za-z0-9_.-]*$/ (no ":", no surrounding whitespace).`, `${cpath}.id`);
 						choicesOk = false;
 						break;
 					}
@@ -465,7 +474,7 @@ export function validateExplanationPlan(input: unknown): ExplainValidation {
 					choices.push({ id: cid, label });
 				}
 				if (!choicesOk) continue;
-				const answerId = trimmed(raw.answerId) ?? "";
+				const answerId = exactId(raw.answerId);
 				if (!choiceIds.has(answerId)) {
 					push(
 						"error",
