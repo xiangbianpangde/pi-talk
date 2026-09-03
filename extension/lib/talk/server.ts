@@ -46,7 +46,7 @@ export interface TalkServer {
 	close(): Promise<void>;
 }
 
-const BRIDGE_SOURCE = `
+export const BRIDGE_SOURCE = `
 (() => {
   const SOURCE = "talk-bridge";
   const surfaceId = (() => {

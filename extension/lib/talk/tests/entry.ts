@@ -2,7 +2,7 @@
  * /talk regression tests (entry). Bundled by run-tests.mjs with esbuild and
  * executed on plain node. Keep tests framework-free (simple assert helpers).
  */
-import { startTalkServer, injectBridge, getBridgeVersion, applyPatchToHtml, compileCompoundSelector } from "../server";
+import { startTalkServer, injectBridge, getBridgeVersion, applyPatchToHtml, compileCompoundSelector, BRIDGE_SOURCE } from "../server";
 import { loadStyleRegistry, parseManifest, validateManifest, getStyleById } from "../registry";
 import { auditReportContent } from "../report-audit";
 import { parseExplanationPlan, validateExplanationPlan } from "../explain/validate";
@@ -572,6 +572,9 @@ test("explain: thesisOf extracts the first sentence without corrupting it (Sol P
 	eq(thesisOf("URL 是 https://api.test/search?q=x。然后回退。"), "URL 是 https://api.test/search?q=x。", "URL with query survives");
 	eq(thesisOf("表达式 ready?next:value 很常见。其次。"), "表达式 ready?next:value 很常见。", "ternary survives");
 	eq(thesisOf("断言 x!.y 是 TS 语法。其次。"), "断言 x!.y 是 TS 语法。", "non-split !. survives");
+	// Sol round-4 probe: Markdown links [text](url) unwrap to display text, avoiding severed [ brackets on 。
+	eq(thesisOf("[https://api.test/search?q=x。](https://api.test/search?q=x。) 然后。"), "https://api.test/search?q=x。", "Markdown link URL survives without severed brackets");
+	eq(thesisOf("[搜索接口](https://api.test/search?q=x) 很稳定。其次。"), "搜索接口 很稳定。", "Markdown link text extracted cleanly");
 });
 test("explain: markdown-lite blocks", () => {
 	const html = renderMarkdownLite("段落一\n\n- 甲\n- 乙\n\n1. 第一\n2. 第二\n\n```\nlet a = 1;\n```");
@@ -691,37 +694,53 @@ test("explain: quiz answers ride the existing event bridge", async () => {
 	ok(correct, "the correct choice exists as a rendered button");
 	const clicked = correct!.value;
 	const clickedLabel = correct!.label;
+	// Production bridge round-trip (Sol round-4): evaluate the actual BRIDGE_SOURCE
+	// code from server.ts in a mock DOM sandbox, fire the production click listener
+	// on the rendered button, and let production talkSend dispatch the real fetch to /api/event.
+	const listeners: Record<string, (ev: any) => void> = {};
+	const mockDoc = {
+		body: { getAttribute: (attr: string) => (attr === "data-talk-surface" ? "main" : null) },
+		addEventListener: (type: string, fn: any) => { listeners[type] = fn; },
+		querySelector: () => null,
+	};
 	const port = rt.server!.port;
-	const status = await new Promise<number>((resolve, reject) => {
-		const req = httpRequest(
-			{
-				host: "127.0.0.1",
-				port,
-				path: "/api/event",
-				method: "POST",
-				headers: { "content-type": "application/json" },
-			},
-			(response) => {
-				response.resume();
-				resolve(response.statusCode ?? 0);
-			},
-		);
-		req.on("error", reject);
-		req.end(
-			JSON.stringify({
-				type: "explain-check",
-				payload: { id: null, text: clickedLabel.slice(0, 200), value: clicked, href: null },
-				source: "talk-bridge",
-				surface: "main",
-			}),
-		);
-	});
-	eq(status, 200, "/api/event accepted the click");
+	const customFetch = (url: string, init: any) => {
+		const fullUrl = url.startsWith("/") ? `http://127.0.0.1:${port}${url}` : url;
+		return fetch(fullUrl, init);
+	};
+	new Function("document", "window", "fetch", "location", "EventSource", BRIDGE_SOURCE)(
+		mockDoc,
+		{},
+		customFetch,
+		{ reload: () => {} },
+		class { addEventListener() {} },
+	);
+	ok(typeof listeners["click"] === "function", "production BRIDGE_SOURCE registered click listener");
+
+	const mockButton = {
+		id: "",
+		innerText: clickedLabel,
+		getAttribute: (attr: string) => {
+			if (attr === "data-talk-event") return "explain-check";
+			if (attr === "data-talk-value") return clicked;
+			return null;
+		},
+	};
+	const clickEv = {
+		target: {
+			closest: (sel: string) => (sel === "[data-talk-event]" ? mockButton : null),
+		},
+	};
+	// Fire production click delegation!
+	listeners["click"](clickEv);
+	await new Promise((r) => setTimeout(r, 100));
+
 	const events = pollEvents(undefined, rt);
 	const answer = events.find((event) => event.type === "explain-check");
 	ok(answer, "explain-check delivered to the agent");
 	eq(answer!.source, "talk-bridge", "event carries the real bridge source tag");
 	eq(String((answer!.payload as { value: string }).value), clicked, "value round-trips verbatim from the rendered button");
+	eq(String((answer!.payload as { text: string }).text), clickedLabel.slice(0, 200), "text round-trips via bridge click delegation");
 	const [checkId, choiceId] = String((answer!.payload as { value: string }).value).split("::");
 	const check = plan.checks!.find((c) => c.id === checkId)!;
 	eq(choiceId === check.answerId, true, "agent-side judgement resolves the answer");

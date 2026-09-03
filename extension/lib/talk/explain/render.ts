@@ -137,7 +137,9 @@ export function plainText(source: string): string {
 	const withoutFences = source
 		.replace(/```[\s\S]*?```/g, " ")
 		.replace(/`([^`]*)`/g, "$1")
-		.replace(/\*\*(.+?)\*\*/g, "$1");
+		.replace(/\*\*(.+?)\*\*/g, "$1")
+		.replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+		.replace(/<(https?:\/\/[^>]+)>/g, "$1");
 	const proseLines: string[] = [];
 	for (const rawLine of withoutFences.split("\n")) {
 		const line = rawLine.trim();
