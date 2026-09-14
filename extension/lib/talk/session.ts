@@ -754,6 +754,7 @@ export async function renderTalk(
 	let renderMeta = input.meta ? { ...input.meta } : undefined;
 	const isReport = governedAsReport(style);
 	const isExplain = governedAsExplain(style);
+	const governed = isReport || isExplain;
 	const reportAudit = isReport ? auditReportContent(input.content) : undefined;
 	const explainAudit = isExplain ? auditExplainContent(input.content) : undefined;
 
@@ -797,7 +798,6 @@ export async function renderTalk(
 				details: { audit: explainAudit },
 			};
 		}
-	}
 	}
 	runtime.styleId = style.id;
 	runtime.title = input.title || runtime.title || style.name;
@@ -881,7 +881,7 @@ export async function renderTalk(
 			});
 		}
 
-		if (governed && contentSecurityPolicy && reportAudit) {
+		if (isReport && contentSecurityPolicy && reportAudit) {
 			html = injectContentSecurityPolicyMeta(html, contentSecurityPolicy, reportStyleNonce);
 			const assembledAudit = auditAssembledReportDocument(html);
 			for (const issue of [...assembledAudit.errors, ...assembledAudit.warnings]) {
