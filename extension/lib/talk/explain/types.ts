@@ -2,9 +2,9 @@
  * Explanation Layer — Explanation IR v1 (types).
  *
  * The IR answers *how a human should come to understand something*. It never
- * answers *how it is painted*: compilation targets the governed `report` design
- * system (`render.ts` → `renderTalk({styleId:"report"})`), so audit, hash-CSP,
- * verify and export stay in one place.
+ * answers *how it is painted*: compilation targets the dedicated `explain` design
+ * system (`render.ts` → `renderTalk({styleId:"explain"})`), with 100% direct
+ * visibility, zero details folding, hash-CSP, and an independent explain safety audit.
  *
  * Deliberately absent (see explain/README.md "砍掉的东西"):
  *   strategy, goal, audience background/unknowns, depth, collapsedByDefault,

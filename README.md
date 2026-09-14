@@ -153,6 +153,7 @@ All 65 tests passing (41 talk & explain core tests + 9 explain design system tes
 
 1. **演进式样式系统（12+ 款样式）**
    - `report`（默认基础样式）：期刊式正式汇报报告系统（温暖纸张色调、衬线字体层级、KPI 统计、卡片、证据表格、时间线、结论框）。
+   - `explain`：专属概念精解设计系统（68ch 单栏沉浸阅读、100% 平铺直陈、零强制折叠、直觉类比破壁、代码走读与内嵌自测）。
    - `arch`：交互式架构图、时序图、数据流图与系统生命周期图（基于 Archify）。
    - `compare`：多版本并排 diff（真实 LCS 算法）：增删改高亮、统计徽章、逐项采纳与红线审阅导出。
    - `evalgrid`：用例 × 模型评测对照台：单元格展开、打分与 baseline 锁定。
@@ -164,6 +165,7 @@ All 65 tests passing (41 talk & explain core tests + 9 explain design system tes
    - `html-interactive` & `html-static`：全功能交互（JS 事件桥接）与安全沙箱静态 HTML。
 
 2. **认知解释层（Explanation Layer · `talk_explain`）**
+   - **专属 Explain 设计系统**：编译至专属 `explain` 概念精解设计系统（`styles/explain/`），采用 68ch 单栏沉浸式阅读流，100% 平铺展开，彻底杜绝任何形式的 details 强行折叠。
    - **解释中间表示（`explain.ir/v1`）**：由浅到深的分层结构（核心一句话、运行机制、实例、代码、生活类比）。
    - **Fail-Closed 确定性校验器**：严密的标识符验证（拒绝修饰或修剪空白，禁止冒号，保证身份精确不变）、封闭 Schema（拒绝未知字段）、边界强约束（limitations 严格限制 1–3 条，拒绝静默截断）。
    - **防错误简化安全闸门**：强制声明边界条件（`limitations`）；类比层强制要求指出“类比在哪里失效”（`analogyBreakage`，杜绝“类比等于本质”的简化误导）。
@@ -190,7 +192,8 @@ All 65 tests passing (41 talk & explain core tests + 9 explain design system tes
 ├── extensions/
 │   ├── talk.ts              # 扩展入口及工具注册
 │   └── lib/talk/            # 核心引擎
-│       ├── explain/         # 解释层：IR 类型定义、fail-closed 校验器与报告编译器
+│       ├── explain/         # 解释层：IR 类型定义、fail-closed 校验器与编译器
+│       ├── explain-audit.ts # explain 专属 parse5 审计器与安全门禁
 │       ├── registry.ts      # 样式包发现与 manifest 校验
 │       ├── report-audit.ts  # parse5 审计器与 CSP 生成器
 │       ├── server.ts        # 本地 HTTP 服务与 SSE 事件桥
@@ -231,7 +234,7 @@ All 65 tests passing (41 talk & explain core tests + 9 explain design system tes
 | 工具 | 作用 |
 |------|------|
 | `talk_render` | 渲染内容到活动表面，支持多表面路由与局部 DOM 补丁更新 |
-| `talk_explain` | 校验并编译 ExplanationPlan (`explain.ir/v1`) 为受治理的分层解释报告 |
+| `talk_explain` | 校验并将 `explain.ir/v1` 蓝图编译并渲染至专属 `explain` 设计系统 |
 | `talk_poll_events` | 轮询用户的交互事件（按钮点击、表单提交、输入） |
 | `talk_verify` | 无头浏览器截屏自检与控制台错误排查 |
 | `talk_export` | 导出表面为 HTML、Markdown、PNG 或 PDF 文件 |
@@ -251,7 +254,7 @@ node extension/lib/talk/tests/run-tests.mjs
 /talk test
 ```
 
-全套 54 项测试全部通过（41 项内核与解释层测试 + 7 项 report 设计系统测试 + 6 项 showcase 测试）。
+全套 65 项测试全部通过（41 项内核与解释层测试 + 9 项 explain 设计系统测试 + 9 项 report 设计系统测试 + 6 项 showcase 测试）。
 
 ---
 

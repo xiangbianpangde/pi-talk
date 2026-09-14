@@ -59,7 +59,8 @@
 ├── extensions/
 │   ├── talk.ts              # 扩展入口及工具注册
 │   └── lib/talk/            # 核心引擎
-│       ├── explain/         # 解释层：IR 类型定义、fail-closed 校验器与报告编译器
+│       ├── explain/         # 解释层：IR 类型定义、fail-closed 校验器与编译器
+│       ├── explain-audit.ts # explain 专属 parse5 审计器与安全门禁
 │       ├── registry.ts      # 样式包发现与 manifest 校验
 │       ├── report-audit.ts  # parse5 审计器与 CSP 生成器
 │       ├── server.ts        # 本地 HTTP 服务与 SSE 事件桥
