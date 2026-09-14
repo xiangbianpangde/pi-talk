@@ -921,22 +921,24 @@ export async function renderTalk(
 			});
 		}
 
-		if (isReport && contentSecurityPolicy && reportAudit) {
+		if (governed && contentSecurityPolicy) {
 			html = injectContentSecurityPolicyMeta(html, contentSecurityPolicy, reportStyleNonce);
-			const assembledAudit = auditAssembledReportDocument(html);
-			for (const issue of [...assembledAudit.errors, ...assembledAudit.warnings]) {
-				const target = issue.severity === "error" ? reportAudit.errors : reportAudit.warnings;
-				if (!target.some((existing) => existing.code === issue.code && existing.message === issue.message)) target.push(issue);
-			}
-			reportAudit.valid = reportAudit.errors.length === 0;
-			if (!reportAudit.valid) {
-				return {
-					ok: false,
-					styleId: style.id,
-					kind: style.kind,
-					message: `Assembled report rejected before publishing. ${formatReportAudit(reportAudit)}`,
-					details: { audit: reportAudit, assembledAudit },
-				};
+			if (isReport && reportAudit) {
+				const assembledAudit = auditAssembledReportDocument(html);
+				for (const issue of [...assembledAudit.errors, ...assembledAudit.warnings]) {
+					const target = issue.severity === "error" ? reportAudit.errors : reportAudit.warnings;
+					if (!target.some((existing) => existing.code === issue.code && existing.message === issue.message)) target.push(issue);
+				}
+				reportAudit.valid = reportAudit.errors.length === 0;
+				if (!reportAudit.valid) {
+					return {
+						ok: false,
+						styleId: style.id,
+						kind: style.kind,
+						message: `Assembled report rejected before publishing. ${formatReportAudit(reportAudit)}`,
+						details: { audit: reportAudit, assembledAudit },
+					};
+				}
 			}
 		}
 

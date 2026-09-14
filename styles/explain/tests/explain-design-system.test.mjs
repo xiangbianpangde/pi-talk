@@ -230,4 +230,41 @@ describe('explain design system sources', () => {
     const forbiddenDetails = '<details><summary>hide</summary><p>secret</p></details>';
     assert.ok(auditExplainContent(forbiddenDetails, { requireStructure: false }).errors.some((e) => e.code === 'forbidden-details'));
   });
+
+  it('generates a complete CSP-protected runtime document with explain-runtime hash', async () => {
+    const { build } = await import('file://' + join(process.env.HOME ?? '', '.pi', 'agent', 'npm', 'node_modules', 'esbuild', 'lib', 'main.js'));
+    const { tmpdir } = await import('node:os');
+    const out = join(tmpdir(), `test-server-csp-${Date.now()}.mjs`);
+    const serverPath = [
+      join(root, '../../extension/lib/talk/server.ts'),
+      join(root, '../../../extensions/lib/talk/server.ts'),
+      join(process.env.HOME ?? '', '.pi/agent/extensions/lib/talk/server.ts'),
+    ].find((c) => existsSync(c));
+    const parse5Path = join(process.env.HOME ?? '', '.pi', 'agent', 'npm', 'node_modules', 'parse5', 'dist', 'index.js');
+
+    assert.ok(serverPath && existsSync(serverPath), 'server.ts must exist');
+
+    await build({
+      entryPoints: [serverPath],
+      bundle: true,
+      platform: 'node',
+      format: 'esm',
+      outfile: out,
+      absWorkingDir: dirname(serverPath),
+      plugins: [{
+        name: 'resolve-parse5',
+        setup(b) { b.onResolve({ filter: /parse5/ }, () => ({ path: parse5Path })); },
+      }],
+      logLevel: 'silent',
+    });
+
+    const { buildReportContentSecurityPolicy, injectContentSecurityPolicyMeta } = await import('file://' + out);
+    const shell = read('index.html');
+    const csp = buildReportContentSecurityPolicy(shell, true);
+    assert.match(csp, /default-src 'none'/);
+    assert.match(csp, /script-src 'sha256-/);
+    const injected = injectContentSecurityPolicyMeta(shell, csp);
+    assert.match(injected, /http-equiv="Content-Security-Policy"/i);
+    assert.match(injected, /id="explain-runtime"/);
+  });
 });
