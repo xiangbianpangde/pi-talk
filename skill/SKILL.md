@@ -65,7 +65,7 @@ report classes, **not** inline-styled `html-interactive` soup.
    - 科研与实验汇报必须遵循五联体：核心假设（`.hypothesis`）、闭环系统（Mermaid）、消融对照（`.ablation-table`）、失效边界（`.boundary-box`）、实证洞见（`.card.discovery`）。
    - **概念解释的场景区分**：
      - ① **正式汇报（Report）正文内的概念说明**：严禁在正文中扔一个无排版全文字 `<details>` 偷懒敷衍，必须采用“一句话定义 + 微图解/代码 + 正反辨析”的结构化解构卡片（参考 COOKBOOK 模板二）。
-     - ② **对话中单点概念的渐进式教学**：当用户在会话中直接要求「解释一下 XX / 我没懂 / 给新人讲讲」时，严格使用 `talk_explain` 工具走 `explain.ir/v1` 渐进式教学层级（首层展开核心，后续深层按教学目标折叠并带理解检查）。
+     - ② **对话中单点概念的渐进式教学**：当用户在会话中直接要求「解释一下 XX / 我没懂 / 给新人讲讲」时，严格使用 `talk_explain` 工具走 `explain.ir/v1` 教学层级（100% 直接平铺可见，绝无 `<details>` 强制折叠，并带内联自测检查）。
 
 ## Commands (user)
 
@@ -93,7 +93,7 @@ report classes, **not** inline-styled `html-interactive` soup.
 | `talk_list_styles` | Discover styles (set `reload: true` after adding packs) |
 | `talk_set_style` | Switch style (`chat`, `html-static`, `html-interactive`, `draw`, packs…) |
 | `talk_render` | Render to the active surface; supports `surface` (multi-surface), `patch` (incremental DOM update) and `verify` (auto screenshot+console) |
-| `talk_explain` | Validate an ExplanationPlan (`explain.ir/v1`) and render it as a governed report: layered explanation + analogy breakage + limitations + optional checks. Fails closed |
+| `talk_explain` | Validate an ExplanationPlan (`explain.ir/v1`) and render it into the dedicated explain design system: 100% directly visible layered explanation, analogy breakage, limits block and optional inline checks. Fails closed |
 | `talk_poll_events` | Read clicks / `talkSend` events / form submissions / debounced input events |
 | `talk_verify` | Visual self-check: headless screenshot + console errors + DOM stats of the current surface |
 | `talk_export` | Export current surface: html / md / png / pdf |

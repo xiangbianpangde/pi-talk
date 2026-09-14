@@ -100,7 +100,7 @@
 | 工具 | 作用 |
 |------|------|
 | `talk_render` | 渲染内容到活动表面，支持多表面路由与局部 DOM 补丁更新 |
-| `talk_explain` | 校验并编译 ExplanationPlan (`explain.ir/v1`) 为受治理的分层解释报告 |
+| `talk_explain` | 校验并将 `explain.ir/v1` 蓝图编译并渲染至专属 `explain` 设计系统 |
 | `talk_poll_events` | 轮询用户的交互事件（按钮点击、表单提交、输入） |
 | `talk_verify` | 无头浏览器截屏自检与控制台错误排查 |
 | `talk_export` | 导出表面为 HTML、Markdown、PNG 或 PDF 文件 |
@@ -120,7 +120,7 @@ node extension/lib/talk/tests/run-tests.mjs
 /talk test
 ```
 
-全套 54 项测试全部通过（41 项内核与解释层测试 + 7 项 report 设计系统测试 + 6 项 showcase 测试）。
+全套 65 项测试全部通过（41 项内核与解释层测试 + 9 项 explain 设计系统测试 + 9 项 report 设计系统测试 + 6 项 showcase 测试）。
 
 ---
 

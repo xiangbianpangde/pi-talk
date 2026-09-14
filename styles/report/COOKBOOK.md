@@ -16,7 +16,7 @@ Reference visual: `智渔粮库 · AI 智能体联合研发方案整合报告.ht
 ### 四不法则（Anti-Patterns）
 - ❌ **不搞空心跑分单**：严禁把“73/73 pass, 0 errors, PASS/PASS”当正文主干（测试数据放入折叠附录）。
 - ❌ **不写假大空宣传报**：严禁以“文件数、100% 通过率”充当阶段进展；必须交代系统行为的真实增量、遇到的阻碍与权衡。
-- ❌ **不在报告正文中使用全文字折叠解释概念**：在手写正式汇报正文时，严禁直接在 `<details>` 内堆砌大段纯文本作为概念说明；必须采用“一句话定义 + 微图解 + 正反辨析 + 实例代码”的结构化卡片。（注：由编译器管理的 talk_explain / explain.ir/v1 保留 details.hook 作为教学分层展开机制，不受此手写正文规则限制）。
+- ❌ **不在报告正文中使用全文字折叠解释概念**：在手写正式汇报正文时，严禁直接在 `<details>` 内堆砌大段纯文本作为概念说明；必须采用“一句话定义 + 微图解 + 正反辨析 + 实例代码”的结构化卡片。（注：概念精解由 `talk_explain` 直达专属 `styles/explain/` 设计系统，采用 100% 直接平铺呈现，严格零 `<details>` 折叠）。
 - ❌ **不列无主语名词清单**：严禁出现“实现了 Adapter, HPS, TraceLink, Hook”这类代码标识符清单。
 
 ---
@@ -183,17 +183,17 @@ Reference visual: `智渔粮库 · AI 智能体联合研发方案整合报告.ht
 
 | 组件用途 | 核心类名 / 语法 | 使用场景 |
 |---|---|---|
-| 核心科学假设 | `.hypothesis > .hypo-tag + h4 + .hypo-body` | 提出科学假设、前提、推论与机理 |
-| 公式与解构 | `.formula-wrap > .formula-math + .formula-vars` | 数学模型、优化目标，配白话变量表 |
+| 核心科学假设 | `.hypothesis` (直接子元素：`.hypo-tag`, `h3\|h4`, `.hypo-body > .hypo-row`) | 提出科学假设、前提、推论与机理 |
+| 公式与解构 | `.formula-wrap` (直接子元素：`.formula-math`, `.formula-vars > .var-item`) | 数学模型、优化目标，配白话变量表 |
 | 消融对照表 | `.tbl-wrap > table.ablation-table` | Baseline vs Ours，`.delta-pos`, `.signif` |
-| 失效边界箱 | `.boundary-box > .boundary-head + .grid.g2` | 诚实记录触发工况、失效现象、归因与启示 |
+| 失效边界箱 | `.boundary-box` (直接子元素：`.boundary-head`, `.grid > .boundary-item`) | 诚实记录触发工况、失效现象、归因与启示 |
 | 样本量徽章 | `.sample-pill.field\|sim\|stat\|warn` | 标注样本量与环境（N=5、p&lt;0.01） |
-| 实证观察洞见 | `.card.discovery > .disc-badge + .vs-compact` | 记录反直觉现象、实测规律与经验对照 |
+| 实证观察洞见 | `.card.discovery` (直接子元素：`.disc-badge`, `h3\|h4`, `p`, `.vs-compact > .v-col`) | 记录反直觉现象、实测规律与经验对照 |
 | 现状方案对比 | `.vs > .vs-col.old + .vs-mid + .vs-col.new` | 传统困境 vs 升级目标 |
 | 流程/架构图 | `.mermaid-wrap > .cap + .mermaid` | 闭环流程图（Flowchart）、分层架构图 |
 | 演进时间轴 | `.tl > .tl-item` | 记录决策与方案收敛历程 |
 | 进度对比条 | `.bar-row > .lbl + .bar > .anim-bar + .val` | 多时间尺度或指标定量进度 |
-| 折叠详情 | `details.conv` (手写正文折叠) / `details.hook` (`talk_explain` 专用) | 边缘或附录信息收纳 |
+| 折叠详情 | `details.conv` (手写正文折叠) | 边缘或附录信息收纳 |
 | 终审定调框 | `.verdict > .lbl + h3 + p + .actions` | 结案结论、决策要求与下一步操作 |
 
 ---

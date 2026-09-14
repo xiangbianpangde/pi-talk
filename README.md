@@ -26,6 +26,7 @@
 
 1. **Evolutionary Style System (12+ Styles)**
    - `report` (default): Journal-style formal report design system (paper palette, serif hierarchy, KPI, cards, evidence tables, timeline, verdict).
+   - `explain`: Dedicated pedagogical explanation design system (distraction-free 68ch single-column layout, 100% directly visible, zero forced details folding, analogy breakage guards, inline checks).
    - `arch`: Interactive architecture, dataflow, sequence, and system maps via Archify.
    - `compare`: Side-by-side LCS diff comparison with redline review loops and clean document export.
    - `evalgrid`: Case × model benchmark grid with 1–5 scoring and baseline locking.
@@ -37,6 +38,7 @@
    - `html-interactive` & `html-static`: Full interactive (JS event bridge) and sandboxed static HTML.
 
 2. **Explanation Layer (`talk_explain`)**
+   - **Dedicated Explain Design System**: Compiles into the independent `explain` design system (`styles/explain/`) with single-column editorial layout (68ch), 100% directly visible content, and strictly zero forced `<details>` folding.
    - **Intermediate Representation (`explain.ir/v1`)**: Structured layers ordered shallow → deep (core, mechanism, example, code, analogy).
    - **Fail-Closed Validation**: Strict identity validation (exact authored tokens, no silent trimming/canonicalization, no colons), closed schema (unknown keys rejected), hard bounds on limitations (1–3 items, never truncated).
    - **Anti-Oversimplification Guards**: Mandatory `limitations[]` rendered as callout notes; mandatory `analogyBreakage` on analogy layers (preventing "analogy = identity").
@@ -63,7 +65,8 @@
 ├── extensions/
 │   ├── talk.ts              # Extension entry point & tool definitions
 │   └── lib/talk/            # Engine core
-│       ├── explain/         # Explanation Layer: IR types, validator & report compiler
+│       ├── explain/         # Explanation Layer: IR types, validator & explain compiler
+│       ├── explain-audit.ts # parse5 safety auditor for explain design system
 │       ├── registry.ts      # Style pack discovery and manifest validation
 │       ├── report-audit.ts  # parse5 safety auditor & CSP generator
 │       ├── server.ts        # Loopback HTTP server & SSE event bridge
@@ -104,7 +107,7 @@
 | Tool | Purpose |
 |------|---------|
 | `talk_render` | Render HTML/JSON/Markdown content or incremental DOM patches |
-| `talk_explain` | Validate and compile an `explain.ir/v1` plan into a governed report |
+| `talk_explain` | Validate and compile an `explain.ir/v1` plan into the dedicated `explain` design system |
 | `talk_poll_events` | Poll user interaction events (button clicks, form submits, inputs) |
 | `talk_verify` | Headless visual screenshot + console error verification |
 | `talk_export` | Export surface to HTML, Markdown, PNG, or PDF |
@@ -124,7 +127,7 @@ node extension/lib/talk/tests/run-tests.mjs
 /talk test
 ```
 
-All 54 tests passing (41 talk & explain core tests + 7 report design system tests + 6 showcase tests).
+All 65 tests passing (41 talk & explain core tests + 9 explain design system tests + 9 report design system tests + 6 showcase tests).
 
 ---
 

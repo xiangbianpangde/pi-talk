@@ -117,7 +117,7 @@ Executive summary → KPI/status → evidence → comparison or risks → timeli
 | Horizontal chain | `.h-tl > .ev + .arrow` | concise operational pipelines or closed loops |
 | Tabs | `.tabs > .tb[data-tab]` + sibling `.tab-pane[data-pane]` | alternate views of evidence to prevent information overload |
 | Progress | `.anim-bar` with custom property `--w` | bounded progress only |
-| Details | `details.conv` (report text) / `details.hook` (`talk_explain` only) | optional depth; hand-authored report text must not hide primary concept explanations in unformatted details folds |
+| Details | `details.conv` | optional depth for secondary appendices; hand-authored report text must not hide primary concept explanations in unformatted details folds |
 | Verdict | `.verdict > .lbl + h3 + p` | final decision, boundary and next action |
 | Actions | `.actions > button[data-talk-event]` | lightweight feedback to the agent |
 
@@ -132,13 +132,13 @@ Modifiers: `.hl`, `.brand`, `.gold`, `.good`, `.crit`, `.discovery`; grid: `.gri
 | Proposal / architecture review | Hero → Real-world dilemmas vs upgrade goals (`.vs`) → Global closed-loop flowchart (Mermaid) → Subsystem deep-dives (`.tabs` + `.tbl-wrap`) → Architecture evolution timeline (`.tl`) → Phased implementation roadmap (`.h-tl`) → Decision request verdict |
 | Progress & milestone update | Hero → Delivered behavioral capabilities (NOT file counts) → Milestone flowchart/burn-down → Technical trade-offs & blockers (`.card.gold`, `.note.warn`) → Next-phase plan verdict |
 | Concept explanation (in report text) | Hero/section → Plain intuition summary → Accompanying visual diagram (.mermaid-wrap / ASCII) → What it IS vs what it is NOT (.vs / .vs-compact) → Concrete real-world example (.code-block) → Takeaway (structured cards; NO unformatted details text-folds) |
-| Explanation layer (talk_explain) | Hero (topic + audience pills) → one-sentence core → deeper layers as details.hook sections (compiler-managed) → analogy with its breakage note → limitations note → understanding checks (.actions buttons) → verdict as the takeaway sentence |
+| Concept explanation (talk_explain) | Handled by talk_explain targeting the dedicated explain design system (styles/explain/): single-column editorial flow, 100% directly visible .layer-block sections (strictly zero details folding), .analogy-card with .breakage-note, .limits-block, and inline .check-card controls |
 
 ## 8. Anti-patterns to reject
 
 1. **Empty test scorecards**: Filling reports with "73/73 pass", "0 errors", and a table of unit test names. A test report must explain the test suite's design strategy, what hypothesis it guards, and what empirical boundaries were discovered.
 2. **Promotional phase progress**: Celebrating "100% pass", "24 files edited", and buzzwords without explaining what system behavior changed or what trade-offs were made.
-3. **All-text `<details>` folds in report bodies**: Hiding a wall of unformatted text inside an ad-hoc `<details>` fold to explain a core concept in report bodies. Use structured cards (`.card`) with mini-diagrams, before/after contrast, and concrete code examples instead. (Compiler-managed `talk_explain` retains progressive `details.hook` for its pedagogical drill-down levels).
+3. **All-text `<details>` folds in report bodies**: Hiding a wall of unformatted text inside an ad-hoc `<details>` fold to explain a core concept in report bodies. Use structured cards (`.card`) with mini-diagrams, before/after contrast, and concrete code examples instead. (Dedicated concept explanations are handled by `talk_explain` and `styles/explain/` with 100% direct visibility and zero details folding).
 4. **Naked jargon lists**: Writing sentences that merely string together technical identifiers without action or user value.
 
 ## 9. Accessibility contract
