@@ -27,10 +27,6 @@
       }
       btn.classList.add('selected');
       btn.setAttribute('aria-pressed', 'true');
-
-      if (typeof window.talkSend === 'function') {
-        window.talkSend('explain-check', { value: btn.getAttribute('data-talk-value') || '' });
-      }
     });
   }
 

@@ -22,7 +22,7 @@ import {
 	EXPLAIN_KIND_LABEL,
 	type ExplanationPlan,
 	type UnderstandingCheck,
-} from "./types.js";
+} from "./types";
 
 export interface CompiledExplanation {
 	html: string;
@@ -133,9 +133,11 @@ export function plainText(markdown: string): string {
 			continue;
 		}
 		if (inFence || !trimmed) continue;
+		if (/^#{1,6}\s+/.test(trimmed)) continue;
 		const stripped = trimmed
 			.replace(/^[-*]\s+/, "")
 			.replace(/^\d+[.)]\s+/, "")
+			.replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
 			.replace(/`([^`\n]+)`/g, "$1")
 			.replace(/\*\*([^*\n]+)\*\*/g, "$1")
 			.trim();

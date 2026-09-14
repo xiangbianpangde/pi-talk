@@ -347,8 +347,9 @@ export function buildReportContentSecurityPolicy(
 ): string {
 	const scriptSources = new Set<string>();
 	const styleSources = new Set<string>();
-	const runtime = template.match(/<script\b(?=[^>]*\bid\s*=\s*(["'])report-runtime\1)[^>]*>([\s\S]*?)<\/script>/i);
-	if (runtime?.[2] !== undefined) scriptSources.add(cspHash(runtime[2]));
+	for (const match of template.matchAll(/<script\b(?=[^>]*\bid\s*=\s*(["'])(?:[a-z0-9_-]+-runtime)\1)[^>]*>([\s\S]*?)<\/script>/gi)) {
+		if (match[2] !== undefined) scriptSources.add(cspHash(match[2]));
+	}
 	for (const match of template.matchAll(/\b(?:integrity|data-sri)\s*=\s*(["'])((?:sha256|sha384|sha512)-[A-Za-z0-9+/=]+)\1/gi)) {
 		scriptSources.add(`'${match[2]}'`);
 	}

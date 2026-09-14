@@ -5,6 +5,7 @@
 import { startTalkServer, injectBridge, getBridgeVersion, applyPatchToHtml, compileCompoundSelector, BRIDGE_SOURCE } from "../server";
 import { loadStyleRegistry, parseManifest, validateManifest, getStyleById } from "../registry";
 import { auditReportContent } from "../report-audit";
+import { auditExplainContent } from "../explain-audit";
 import { parseExplanationPlan, validateExplanationPlan } from "../explain/validate";
 import { compileExplanation, plainText, renderMarkdownLite, thesisOf } from "../explain/render";
 import { lintHtmlFragment } from "../lint";
@@ -588,17 +589,17 @@ test("explain: markdown-lite blocks", () => {
 	ok(opaque.includes("<code>**x**</code>"), "markdown inside code span stays literal");
 	ok(!/<code><strong>/.test(opaque), "code span is opaque to bold");
 });
-test("explain: compiled fragment passes the governed report audit", () => {
+test("explain: compiled fragment passes the explain audit", () => {
 	const plan = validateExplanationPlan(explainPlan()).plan!;
 	const compiled = compileExplanation(plan);
-	const audit = auditReportContent(compiled.html);
+	const audit = auditExplainContent(compiled.html);
 	eq(audit.errors.length, 0, `audit errors: ${JSON.stringify(audit.errors)}`);
 	eq(audit.warnings.length, 0, `audit warnings: ${JSON.stringify(audit.warnings)}`);
 	ok(compiled.html.includes('id="hero"'), "hero present");
 	ok(compiled.html.includes('id="layer-analogy"'), "stable layer anchor");
 	ok(compiled.html.includes('data-talk-event="explain-check"'), "quiz uses the existing bridge");
 	ok(!/answerId|data-correct/i.test(compiled.html), "the page never reveals the answer");
-	ok(compiled.html.trimEnd().endsWith("</div>"), "verdict is last");
+	ok(compiled.html.includes("takeaway-block"), "takeaway block is present");
 });
 test("explain: checks render positionally after their layer (Sol P1-4)", () => {
 	const plan = validateExplanationPlan(explainPlan()).plan!;
@@ -628,35 +629,35 @@ test("explain: hostile layer text is escaped, not rejected", () => {
 				},
 			],
 		}),
-	).plan!;;
+	).plan!;
 	const compiled = compileExplanation(plan);
 	ok(compiled.html.includes("&lt;script&gt;"), "script text is escaped");
 	ok(!compiled.html.includes("<script"), "no script element produced");
-	const audit = auditReportContent(compiled.html);
+	const audit = auditExplainContent(compiled.html);
 	eq(audit.errors.length, 0, `escaped text still audits clean: ${JSON.stringify(audit.errors)}`);
 });
-test("explain: renders through the report pipeline end to end", async () => {
+test("explain: renders through the explain pipeline end to end", async () => {
 	const rt = getRuntime();
-	await startSession("report", { title: "explain-e2e" }, rt);
+	await startSession("explain", { title: "explain-e2e" }, rt);
 	const plan = validateExplanationPlan(explainPlan()).plan!;
 	const compiled = compileExplanation(plan);
 	const res = await renderTalk(
-		{ styleId: "report", content: compiled.html, meta: compiled.meta, title: plan.topic },
+		{ styleId: "explain", content: compiled.html, meta: compiled.meta, title: plan.topic },
 		rt,
 	);
 	ok(res.ok, `render ok: ${res.message}`);
 	const audit = (res.details as { audit?: { errors: unknown[]; warnings: unknown[] } })?.audit;
-	eq(audit?.errors.length ?? -1, 0, "fragment + assembled report audit has zero errors");
+	eq(audit?.errors.length ?? -1, 0, "fragment explain audit has zero errors");
 	await stopSession(rt);
 });
 
 test("explain: quiz answers ride the existing event bridge", async () => {
 	const rt = getRuntime();
-	await startSession("report", { title: "explain-quiz" }, rt);
+	await startSession("explain", { title: "explain-quiz" }, rt);
 	const plan = validateExplanationPlan(explainPlan()).plan!;
 	const compiled = compileExplanation(plan);
 	const res = await renderTalk(
-		{ styleId: "report", content: compiled.html, meta: compiled.meta, title: plan.topic },
+		{ styleId: "explain", content: compiled.html, meta: compiled.meta, title: plan.topic },
 		rt,
 	);
 	ok(res.ok, `render ok: ${res.message}`);

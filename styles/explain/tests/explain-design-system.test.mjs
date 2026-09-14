@@ -59,4 +59,72 @@ describe('explain design system sources', () => {
     assert.match(js, /forbidden-details|details/i);
     assert.match(js, /root\.querySelectorAll\('details'\)/);
   });
+
+  it('enforces safety, attribute allowlist and tree complexity limits in explain audit', async () => {
+    const { build } = await import('file://' + join(process.env.HOME ?? '', '.pi', 'agent', 'npm', 'node_modules', 'esbuild', 'lib', 'main.js'));
+    const { tmpdir } = await import('node:os');
+    const { existsSync } = await import('node:fs');
+    const out = join(tmpdir(), `test-audit-explain-${Date.now()}.mjs`);
+    const serverAuditPath = [
+      join(root, '../../extension/lib/talk/explain-audit.ts'),
+      join(root, '../../../extensions/lib/talk/explain-audit.ts'),
+      join(process.env.HOME ?? '', '.pi/agent/extensions/lib/talk/explain-audit.ts'),
+    ].find((c) => existsSync(c));
+    const parse5Path = join(process.env.HOME ?? '', '.pi', 'agent', 'npm', 'node_modules', 'parse5', 'dist', 'index.js');
+
+    assert.ok(serverAuditPath && existsSync(serverAuditPath), 'explain-audit.ts must exist');
+    await build({
+      entryPoints: [serverAuditPath],
+      bundle: true,
+      platform: 'node',
+      format: 'esm',
+      outfile: out,
+      absWorkingDir: dirname(serverAuditPath),
+      plugins: [{
+        name: 'resolve-parse5',
+        setup(b) { b.onResolve({ filter: /parse5/ }, () => ({ path: parse5Path })); },
+      }],
+      logLevel: 'silent',
+    });
+
+    const { auditExplainContent } = await import('file://' + out);
+
+    // 1. Details tag is strictly forbidden
+    const withDetails = '<section class="explain-hero" id="hero"><h1>Title</h1></section><details><summary>test</summary><p>hide</p></details>';
+    assert.ok(auditExplainContent(withDetails).errors.some((e) => e.code === 'forbidden-details'));
+
+    // 2. Unsafe javascript: URL is blocked
+    const withJsUrl = '<section class="explain-hero" id="hero"><h1>Title</h1></section><p><a href="javascript:alert(1)">click</a></p>';
+    assert.ok(auditExplainContent(withJsUrl).errors.some((e) => e.code === 'unsafe-url'));
+
+    // 3. Inline style attributes are forbidden
+    const withStyle = '<section class="explain-hero" id="hero"><h1>Title</h1></section><p style="color:red">styled</p>';
+    assert.ok(auditExplainContent(withStyle).errors.some((e) => e.code === 'forbidden-style'));
+
+    // 4. Target _blank without rel="noopener" is blocked
+    const withBlankTarget = '<section class="explain-hero" id="hero"><h1>Title</h1></section><p><a href="https://example.com" target="_blank">link</a></p>';
+    assert.ok(auditExplainContent(withBlankTarget).errors.some((e) => e.code === 'unsafe-link-target'));
+
+    // 5. Deep nesting exceeds max depth
+    let deep = '<span>deep</span>';
+    for (let i = 0; i < 140; i += 1) deep = `<div>${deep}</div>`;
+    const withDeep = `<section class="explain-hero" id="hero"><h1>Title</h1></section>${deep}`;
+    assert.ok(auditExplainContent(withDeep).errors.some((e) => e.code === 'fragment-too-complex'));
+
+    // 6. Valid explain template audits with 0 errors
+    const valid = `
+      <section class="explain-hero" id="hero">
+        <div class="tag-row"><span class="pill primary">初级</span></div>
+        <h1>有效概念解释</h1>
+        <p class="lead">第一直觉。</p>
+      </section>
+      <section id="layer-core" class="layer-block">
+        <div class="layer-tag">01 · 核心</div>
+        <h2>原理说明</h2>
+        <div class="layer-body"><p>正文内容。</p></div>
+      </section>
+    `;
+    const res = auditExplainContent(valid);
+    assert.equal(res.errors.length, 0, `valid template errors: ${JSON.stringify(res.errors)}`);
+  });
 });

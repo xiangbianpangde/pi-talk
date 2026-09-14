@@ -545,6 +545,16 @@ function summarizeReportAudit(audit: ReportAuditResult) {
 	};
 }
 
+function summarizeExplainAudit(audit: ExplainAuditResult) {
+	return {
+		version: audit.version,
+		valid: audit.valid,
+		errors: audit.errors,
+		warnings: audit.warnings,
+		stats: audit.stats,
+	};
+}
+
 /** Flatten talk_render meta + defaults into template {{vars}}. */
 export function buildTemplateVars(opts: {
 	content: string;
@@ -952,11 +962,22 @@ export async function renderTalk(
 
 		writeSessionMeta(runtime);
 		persistRuntime(runtime);
+		const auditSummary = reportAudit
+			? summarizeReportAudit(reportAudit)
+			: explainAudit
+			? summarizeExplainAudit(explainAudit)
+			: undefined;
+		const auditMsg = reportAudit
+			? ` · ${formatReportAudit(reportAudit)}`
+			: explainAudit
+			? ` · ${formatExplainAudit(explainAudit)}`
+			: "";
+
 		return {
 			ok: true,
 			styleId: style.id,
 			kind: style.kind,
-			message: `Rendered ${style.id}@${targetSurface} at ${runtime.url}${reportAudit ? ` · ${formatReportAudit(reportAudit)}` : ""}${verifyResult ? ` · verify: ${verifyResult.ok ? "ok" : "failed"}` : ""}`,
+			message: `Rendered ${style.id}@${targetSurface} at ${runtime.url}${auditMsg}${verifyResult ? ` · verify: ${verifyResult.ok ? "ok" : "failed"}` : ""}`,
 			url: runtime.url,
 			file: runtime.file,
 			details: {
@@ -965,7 +986,9 @@ export async function renderTalk(
 				surface: targetSurface,
 				version: runtime.versionCount,
 				sessionId: runtime.sessionId,
-				...(reportAudit ? { audit: summarizeReportAudit(reportAudit) } : {}),
+				...(auditSummary ? { audit: auditSummary } : {}),
+				...(reportAudit ? { reportAudit: summarizeReportAudit(reportAudit) } : {}),
+				...(explainAudit ? { explainAudit: summarizeExplainAudit(explainAudit) } : {}),
 				...(lint?.length ? { lint } : {}),
 				...(verifyResult ? { verify: verifyResult } : {}),
 			},

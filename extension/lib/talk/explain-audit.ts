@@ -48,6 +48,25 @@ const RESERVED_IDS = new Set([
 	"explain-content-root", "explain-main", "explain-runtime", "talk-bridge",
 ]);
 
+const GLOBAL_ATTRIBUTES = new Set([
+	"class", "dir", "id", "lang", "role", "tabindex", "title", "aria-label", "aria-hidden", "aria-pressed",
+]);
+
+const ELEMENT_ATTRIBUTES: Record<string, Set<string>> = {
+	a: new Set(["download", "href", "rel", "target"]),
+	button: new Set(["disabled", "type", "aria-pressed"]),
+	col: new Set(["span"]),
+	colgroup: new Set(["span"]),
+	img: new Set(["alt", "decoding", "height", "loading", "src", "width"]),
+	td: new Set(["colspan", "headers", "rowspan"]),
+	th: new Set(["abbr", "colspan", "headers", "rowspan", "scope"]),
+	time: new Set(["datetime"]),
+};
+
+const ALLOWED_DATA_ATTRIBUTES = new Set([
+	"data-talk-event", "data-talk-value", "data-target",
+]);
+
 function attrsOf(node: HtmlNode): Map<string, string> {
 	return new Map((node.attrs ?? []).map((attribute: { name: string; value: string }) => [attribute.name.toLowerCase(), attribute.value]));
 }
@@ -78,12 +97,62 @@ function descendants(node: HtmlNode): HtmlNode[] {
 	return out;
 }
 
-function hasDescendantClass(node: HtmlNode, className: string): boolean {
-	return descendants(node).some((child) => isElement(child) && classesOf(child).has(className));
+function inspectTreeLimits(root: HtmlNode): { nodes: number; maxDepth: number; exceeded: boolean } {
+	let nodes = 0;
+	let maxDepth = 0;
+	const stack: Array<{ node: HtmlNode; depth: number }> = [{ node: root, depth: 0 }];
+	while (stack.length) {
+		const entry = stack.pop();
+		if (!entry?.node) continue;
+		nodes += 1;
+		maxDepth = Math.max(maxDepth, entry.depth);
+		if (nodes > MAX_EXPLAIN_NODES || maxDepth > MAX_EXPLAIN_DEPTH) return { nodes, maxDepth, exceeded: true };
+		const children = [...(entry.node.childNodes ?? [])];
+		if (entry.node.content) children.push(entry.node.content);
+		for (let index = children.length - 1; index >= 0; index -= 1) stack.push({ node: children[index], depth: entry.depth + 1 });
+	}
+	return { nodes, maxDepth, exceeded: false };
 }
 
 function findDescendantByClass(node: HtmlNode, className: string): HtmlNode | undefined {
 	return descendants(node).find((child) => isElement(child) && classesOf(child).has(className));
+}
+
+function decodeUrlForAudit(value: string): string {
+	let decoded = value;
+	for (let pass = 0; pass < 3; pass += 1) {
+		const next = decoded
+			.replace(/%([0-9a-f]{2})/gi, (_, hex: string) => String.fromCharCode(Number.parseInt(hex, 16)))
+			.replace(/&(amp|colon|tab|newline);?/gi, (_, name: string) => {
+				const values: Record<string, string> = { amp: "&", colon: ":", tab: "\t", newline: "\n" };
+				return values[name.toLowerCase()] ?? "";
+			});
+		if (next === decoded) break;
+		decoded = next;
+	}
+	return decoded.replace(/[\u0000-\u0020\u007f-\u009f\s]+/g, "").toLowerCase();
+}
+
+function isSafeUrl(attribute: "href" | "src", value: string): { safe: boolean; javascript: boolean } {
+	const normalized = decodeUrlForAudit(value);
+	if (!normalized || normalized.startsWith("#") || normalized.startsWith("/") || normalized.startsWith("./") || normalized.startsWith("../")) {
+		return { safe: true, javascript: false };
+	}
+	if (normalized.startsWith("javascript:") || normalized.startsWith("vbscript:")) {
+		return { safe: false, javascript: true };
+	}
+	const scheme = normalized.match(/^([a-z][a-z0-9+.-]*):/i)?.[1]?.toLowerCase();
+	if (!scheme) return { safe: true, javascript: false };
+	if (attribute === "href") return { safe: ["http", "https", "mailto", "tel"].includes(scheme), javascript: false };
+	if (["http", "https"].includes(scheme)) return { safe: true, javascript: false };
+	if (scheme === "data") {
+		return { safe: /^data:image\/(?:png|jpe?g|gif|webp|avif);base64,/i.test(normalized), javascript: false };
+	}
+	return { safe: false, javascript: false };
+}
+
+function stableToken(value: string): boolean {
+	return /^[A-Za-z][A-Za-z0-9_.:-]*$/.test(value);
 }
 
 export function auditExplainContent(content: string): ExplainAuditResult {
@@ -125,6 +194,19 @@ export function auditExplainContent(content: string): ExplainAuditResult {
 		}
 	}
 
+	const limits = inspectTreeLimits(fragment);
+	if (limits.exceeded) {
+		add("error", "fragment-too-complex", `Explain fragment exceeds max nodes (${MAX_EXPLAIN_NODES}) or max depth (${MAX_EXPLAIN_DEPTH}).`);
+		return {
+			version: EXPLAIN_DESIGN_SYSTEM_VERSION,
+			valid: false,
+			errors: issues.filter((i) => i.severity === "error"),
+			warnings: issues.filter((i) => i.severity === "warning"),
+			normalizedHtml: "",
+			stats: { bytes: byteLength, layers: 0, analogies: 0, codeBlocks: 0, checks: 0 },
+		};
+	}
+
 	const ids = new Map<string, number>();
 	const headings: Array<{ level: number; node: HtmlNode }> = [];
 	let layerCount = 0;
@@ -160,6 +242,59 @@ export function auditExplainContent(content: string): ExplainAuditResult {
 			return;
 		}
 
+		// 属性白名单与安全校验
+		const allowedAttrs = new Set([...GLOBAL_ATTRIBUTES, ...(ELEMENT_ATTRIBUTES[name] ?? [])]);
+		for (const [attrName, attrVal] of attrs) {
+			if (attrName.startsWith("data-")) {
+				if (!ALLOWED_DATA_ATTRIBUTES.has(attrName)) {
+					add("error", "disallowed-data-attribute", `Data attribute ${attrName} is not in the explain schema.`);
+				} else if (attrName === "data-talk-event" && !["a", "button"].includes(name)) {
+					add("error", "invalid-attribute", "data-talk-event is only permitted on links or buttons.");
+				} else if (attrName === "data-talk-event" && !stableToken(attrVal)) {
+					add("error", "invalid-attribute", "data-talk-event must be a stable ASCII identifier.");
+				}
+				continue;
+			}
+			if (attrName.startsWith("on")) {
+				add("error", "active-attribute", `Inline handler ${attrName} is prohibited.`);
+				continue;
+			}
+			if (attrName === "style") {
+				// Explain 设计系统完全平铺，不需要作者自定义内联 style
+				add("error", "forbidden-style", "Inline style attributes are forbidden in explain fragments; use explain design-system classes.");
+				continue;
+			}
+			if (!allowedAttrs.has(attrName)) {
+				add("error", "disallowed-attribute", `Attribute ${attrName} is not permitted on <${name}>.`);
+				continue;
+			}
+
+			// URL 安全性校验
+			if (attrName === "href" || attrName === "src") {
+				const check = isSafeUrl(attrName as "href" | "src", attrVal);
+				if (!check.safe) {
+					add("error", "unsafe-url", `Unsafe URL scheme in ${attrName}="${attrVal}".`);
+				}
+			}
+
+			// Link target 安全性
+			if (name === "a" && attrName === "target") {
+				if (attrVal === "_blank") {
+					const rel = (attrs.get("rel") ?? "").toLowerCase().split(/\s+/);
+					if (!rel.includes("noopener")) {
+						add("error", "unsafe-link-target", 'Links with target="_blank" must include rel="noopener".');
+					}
+				}
+			}
+
+			// Button 类型
+			if (name === "button" && attrName === "type") {
+				if (attrVal !== "button") {
+					add("error", "invalid-button-type", 'Buttons in explain must use type="button".');
+				}
+			}
+		}
+
 		const id = attrs.get("id");
 		if (id) {
 			if (RESERVED_IDS.has(id)) add("error", "reserved-id", `ID #${id} is reserved by the explain shell.`);
@@ -177,23 +312,6 @@ export function auditExplainContent(content: string): ExplainAuditResult {
 		}
 		if (classes.has("code-block")) codeBlockCount += 1;
 		if (classes.has("check-card")) checkCount += 1;
-
-		// 检查 style 属性（禁止非令牌内联布局）
-		const styleAttr = attrs.get("style");
-		if (styleAttr && styleAttr.trim()) {
-			const parts = styleAttr.split(";").map((p) => p.trim()).filter(Boolean);
-			const nonToken = parts.some((p) => !/^--[a-z0-9_-]+\s*:/i.test(p));
-			if (nonToken) {
-				add("error", "inline-style", "Explain pages only allow design system tokens for inline styles; use classes for layout.");
-			}
-		}
-
-		// 检查 onclick 等内联事件
-		for (const [attrName] of attrs) {
-			if (/^on[a-z]+/i.test(attrName)) {
-				add("error", "active-attribute", `Inline handler ${attrName} is prohibited.`);
-			}
-		}
 	};
 
 	const stack = [...(fragment.childNodes ?? [])].reverse();
@@ -260,4 +378,3 @@ export function formatExplainAudit(result: ExplainAuditResult): string {
 	for (const issue of result.warnings) parts.push(`  ⚠️  [${issue.code}] ${issue.message}`);
 	return parts.join("\n");
 }
-
