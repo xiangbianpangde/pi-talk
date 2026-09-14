@@ -111,9 +111,11 @@ describe('explain design system sources', () => {
     const withBadId = '<section class="explain-hero" id="hero"><h1>Title</h1></section><div id="bad id">text</div>';
     assert.ok(auditExplainContent(withBadId).errors.some((e) => e.code === 'invalid-id'));
 
-    // 6. Analogy-card without analogy-text is blocked
+    // 6. Analogy-card without analogy-text or with nested wrapper instead of direct children is blocked
     const incompleteAnalogy = '<section class="explain-hero" id="hero"><h1>Title</h1></section><div class="analogy-card"><div class="breakage-note">note</div></div>';
     assert.ok(auditExplainContent(incompleteAnalogy).errors.some((e) => e.code === 'analogy-anatomy'));
+    const wrappedAnalogy = '<section class="explain-hero" id="hero"><h1>Title</h1></section><div class="analogy-card"><div class="analogy-text">a</div><div class="wrapper"><div class="breakage-note">b</div></div></div>';
+    assert.ok(auditExplainContent(wrappedAnalogy).errors.some((e) => e.code === 'analogy-anatomy'), 'expected analogy-anatomy on nested wrapper');
 
     // 7. Deep nesting exceeds max depth
     let deep = '<span>deep</span>';

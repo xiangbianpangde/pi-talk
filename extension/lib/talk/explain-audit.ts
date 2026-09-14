@@ -347,12 +347,13 @@ export function auditExplainContent(content: string): ExplainAuditResult {
 		}
 	}
 
-	// 校验类比卡片必须包含类比文本和失效说明
+	// 校验类比卡片必须包含直接子项 .analogy-text 且其后紧跟 .breakage-note
 	for (const analogy of analogyNodes) {
-		const hasText = findDescendantByClass(analogy, "analogy-text");
-		const hasBreakage = findDescendantByClass(analogy, "breakage-note");
-		if (!hasText || !hasBreakage) {
-			add("error", "analogy-anatomy", "Each .analogy-card must contain both .analogy-text and .breakage-note descendants.");
+		const directElements = (analogy.childNodes ?? []).filter(isElement);
+		const textIndex = directElements.findIndex((child: HtmlNode) => classesOf(child).has("analogy-text"));
+		const breakageIndex = directElements.findIndex((child: HtmlNode) => classesOf(child).has("breakage-note"));
+		if (textIndex === -1 || breakageIndex === -1 || breakageIndex < textIndex) {
+			add("error", "analogy-anatomy", "Each .analogy-card must contain direct child .analogy-text followed by .breakage-note.");
 		}
 	}
 

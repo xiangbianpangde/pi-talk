@@ -65,10 +65,17 @@
       }
     }
 
-    // 校验类比卡片必须包含类比文本和失效说明
+    // 校验类比卡片必须包含直接子项 .analogy-text 且紧跟 .breakage-note
     root.querySelectorAll('.analogy-card').forEach(function (node, index) {
-      if (!node.querySelector('.analogy-text') || !node.querySelector('.breakage-note')) {
-        errors.push('第 ' + (index + 1) + ' 个类比卡片缺少 .analogy-text 或 .breakage-note。');
+      var directElements = Array.prototype.filter.call(node.children, function (el) { return el.nodeType === 1; });
+      var textIndex = -1;
+      var breakageIndex = -1;
+      for (var i = 0; i < directElements.length; i += 1) {
+        if (directElements[i].classList.contains('analogy-text')) textIndex = i;
+        if (directElements[i].classList.contains('breakage-note')) breakageIndex = i;
+      }
+      if (textIndex === -1 || breakageIndex === -1 || breakageIndex < textIndex) {
+        errors.push('第 ' + (index + 1) + ' 个 .analogy-card 必须包含直接子元素 .analogy-text 且紧跟 .breakage-note。');
       }
     });
 
