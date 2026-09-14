@@ -267,4 +267,47 @@ describe('explain design system sources', () => {
     assert.match(injected, /http-equiv="Content-Security-Policy"/i);
     assert.match(injected, /id="explain-runtime"/);
   });
+
+  it('verifies renderTalk branch executes injectContentSecurityPolicyMeta for explain style', async () => {
+    const { build } = await import('file://' + join(process.env.HOME ?? '', '.pi', 'agent', 'npm', 'node_modules', 'esbuild', 'lib', 'main.js'));
+    const { tmpdir } = await import('node:os');
+    const out = join(tmpdir(), `test-session-csp-branch-${Date.now()}.mjs`);
+    const sessionPath = [
+      join(root, '../../extension/lib/talk/session.ts'),
+      join(root, '../../../extensions/lib/talk/session.ts'),
+      join(process.env.HOME ?? '', '.pi/agent/extensions/lib/talk/session.ts'),
+    ].find((c) => existsSync(c));
+    const parse5Path = join(process.env.HOME ?? '', '.pi', 'agent', 'npm', 'node_modules', 'parse5', 'dist', 'index.js');
+
+    assert.ok(sessionPath && existsSync(sessionPath), 'session.ts must exist');
+
+    await build({
+      entryPoints: [sessionPath],
+      bundle: true,
+      platform: 'node',
+      format: 'esm',
+      outfile: out,
+      absWorkingDir: dirname(sessionPath),
+      plugins: [{
+        name: 'resolve-parse5',
+        setup(b) { b.onResolve({ filter: /parse5/ }, () => ({ path: parse5Path })); },
+      }],
+      logLevel: 'silent',
+    });
+
+    const { getRuntime, startSession, renderTalk, stopSession } = await import('file://' + out);
+    const rt = getRuntime();
+    await startSession('explain', { title: 'branch-csp-test' }, rt);
+    const res = await renderTalk({
+      styleId: 'explain',
+      content: '<section class="explain-hero" id="hero"><h1>Test</h1><p class="lead">lead</p></section>',
+      title: 'Branch CSP Test',
+    }, rt);
+    assert.equal(res.ok, true, `renderTalk failed: ${res.message}`);
+    const html = rt.server?.getState('main')?.html ?? '';
+    assert.match(html, /<meta[^>]*Content-Security-Policy/i, 'must inject CSP meta tag in renderTalk');
+    assert.match(html, /script-src\s+(&#39;|\x27)sha256-/, 'must include script hashes in CSP');
+    assert.match(html, /id="explain-runtime"/, 'must retain explain-runtime');
+    await stopSession(rt);
+  });
 });
