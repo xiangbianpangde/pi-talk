@@ -12,7 +12,7 @@ import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { parse as parseHtml } from "../../../npm/node_modules/parse5/dist/index.js";
 import { getSessionDir } from "./paths";
-import { chromeCapture } from "./verify";
+import { chromeCapture, probeWithPlaywright } from "./verify";
 import type { TalkRenderResult } from "./types";
 
 export type TalkExportFormat = "html" | "md" | "png" | "pdf";
@@ -88,12 +88,50 @@ export async function exportSurface(
 			};
 		}
 
-		if (opts.format === "png" || opts.format === "pdf") {
+		if (opts.format === "png") {
 			const base = target.server.url;
 			const url = surface === "main" ? base : `${base}s/${surface}`;
-			const out = resolveOut(opts.format);
+			const out = resolveOut("png");
+			// Prefer Playwright for full-page screenshots (true dynamic height without truncation)
+			let captured = false;
+			try {
+				const probe = await probeWithPlaywright(url, out);
+				if (probe.ok && existsSync(out)) captured = true;
+			} catch {
+				/* fall through to chromeCapture */
+			}
+			if (!captured) {
+				const capture = await chromeCapture(url, out, {
+					pdf: false,
+					width: opts.width,
+					height: opts.height ?? 4800,
+				});
+				if (!capture.ok) {
+					return {
+						ok: false,
+						styleId: "",
+						kind: "html",
+						message: `Export png failed: ${capture.error || capture.stderr || "capture error"}`,
+						details: { format: "png", surface },
+					};
+				}
+			}
+			return {
+				ok: true,
+				styleId: "",
+				kind: "html",
+				message: `Exported png → ${out}`,
+				file: out,
+				details: { format: "png", surface, url },
+			};
+		}
+
+		if (opts.format === "pdf") {
+			const base = target.server.url;
+			const url = surface === "main" ? base : `${base}s/${surface}`;
+			const out = resolveOut("pdf");
 			const capture = await chromeCapture(url, out, {
-				pdf: opts.format === "pdf",
+				pdf: true,
 				width: opts.width,
 				height: opts.height,
 			});
@@ -102,17 +140,17 @@ export async function exportSurface(
 					ok: false,
 					styleId: "",
 					kind: "html",
-					message: `Export ${opts.format} failed: ${capture.error || capture.stderr || "capture error"}`,
-					details: { format: opts.format, surface },
+					message: `Export pdf failed: ${capture.error || capture.stderr || "capture error"}`,
+					details: { format: "pdf", surface },
 				};
 			}
 			return {
 				ok: true,
 				styleId: "",
 				kind: "html",
-				message: `Exported ${opts.format} → ${out}`,
+				message: `Exported pdf → ${out}`,
 				file: out,
-				details: { format: opts.format, surface, url },
+				details: { format: "pdf", surface, url },
 			};
 		}
 

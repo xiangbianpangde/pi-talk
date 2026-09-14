@@ -307,9 +307,15 @@ body{
 
 /* —— 打印与降级适配 —— */
 @media print{
-  body{background:#fff;color:#000}
+  @page{size:A4 portrait;margin:16mm 14mm}
+  body{background:#fff!important;color:#000!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;overflow-wrap:break-word;word-break:break-word;line-break:strict}
   .explain-shell{max-width:none;padding:0}
-  .analogy-card,.check-card,.takeaway-block,.limits-block{box-shadow:none;break-inside:avoid}
+  .explain-hero,.layer-block,.analogy-card,.check-card,.takeaway-block,.limits-block,.code-block{box-shadow:none;break-inside:avoid;page-break-inside:avoid}
+  .layer-tag{break-after:avoid;page-break-after:avoid}
+  h1,h2,h3,h4,h5,h6{break-after:avoid;page-break-after:avoid}
+  p,li{orphans:3;widows:3}
+  pre,code,.code-block{white-space:pre-wrap!important;word-break:break-all!important;overflow-wrap:anywhere!important}
+  svg{max-width:100%!important;height:auto!important}
   .choice-btn{border:1px solid #ccc;background:#fff;color:#000}
 }
 @media (prefers-reduced-motion:reduce){

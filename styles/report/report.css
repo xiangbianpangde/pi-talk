@@ -579,12 +579,20 @@
     html{scroll-behavior:auto}*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}
   }
   @media print{
-    @page{size:A4;margin:14mm}
-    body{background:#fff!important;color:#111;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    @page{size:A4 portrait;margin:16mm 14mm}
+    body{background:#fff!important;color:#111;-webkit-print-color-adjust:exact;print-color-adjust:exact;overflow-wrap:break-word;word-break:break-word;line-break:strict}
     .report-side,.skip-link,.btn-row,.actions,.tabs,.tabbar{display:none!important}
     .report-main{width:100%;max-width:none;margin:0;padding:0}
-    .hero,.card,.kpi,.tbl-wrap,.verdict,.note,.mermaid-wrap,.hypothesis,.boundary-box,.formula-wrap{box-shadow:none;break-inside:avoid}
-    .sec-head{break-after:avoid}.tbl-wrap{overflow:visible}.tbl-wrap table{min-width:0}
+    .hero,.card,.kpi,.tbl-wrap,.verdict,.note,.mermaid-wrap,.hypothesis,.boundary-box,.formula-wrap,.vs,.tl,.h-tl{box-shadow:none;break-inside:avoid;page-break-inside:avoid}
+    .sec-head,.layer-tag,caption{break-after:avoid;page-break-after:avoid}
+    h1,h2,h3,h4,h5,h6{break-after:avoid;page-break-after:avoid}
+    p,li{orphans:3;widows:3}
+    .tbl-wrap{overflow:visible}.tbl-wrap table{min-width:0;page-break-inside:auto}
+    thead{display:table-header-group}
+    tfoot{display:table-footer-group}
+    tr{break-inside:avoid;page-break-inside:avoid}
+    pre,code,.code-block{white-space:pre-wrap!important;word-break:break-all!important;overflow-wrap:anywhere!important}
+    svg,.mermaid svg{max-width:100%!important;height:auto!important}
     .tab-pane,.tab-panel,.tab-pane[hidden],.tab-panel[hidden]{display:block!important;animation:none!important;padding:8px 0 12px}
     .tab-pane::before,.tab-panel::before{content:attr(data-print-title);display:block;margin:6px 0 4px;font:700 11px var(--mono);letter-spacing:.6px;color:var(--brand)}
     details>*,details:not([open])>*{display:block!important}
