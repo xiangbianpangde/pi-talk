@@ -114,10 +114,6 @@ function inspectTreeLimits(root: HtmlNode): { nodes: number; maxDepth: number; e
 	return { nodes, maxDepth, exceeded: false };
 }
 
-function findDescendantByClass(node: HtmlNode, className: string): HtmlNode | undefined {
-	return descendants(node).find((child) => isElement(child) && classesOf(child).has(className));
-}
-
 function decodeUrlForAudit(value: string): string {
 	let decoded = value;
 	for (let pass = 0; pass < 3; pass += 1) {
