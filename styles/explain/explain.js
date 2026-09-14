@@ -65,10 +65,10 @@
       }
     }
 
-    // 校验类比失效点
+    // 校验类比卡片必须包含类比文本和失效说明
     root.querySelectorAll('.analogy-card').forEach(function (node, index) {
-      if (!node.querySelector('.breakage-note')) {
-        errors.push('第 ' + (index + 1) + ' 个类比卡片缺少 .breakage-note（类比失效说明）。');
+      if (!node.querySelector('.analogy-text') || !node.querySelector('.breakage-note')) {
+        errors.push('第 ' + (index + 1) + ' 个类比卡片缺少 .analogy-text 或 .breakage-note。');
       }
     });
 

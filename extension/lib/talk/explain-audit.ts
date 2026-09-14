@@ -49,7 +49,7 @@ const RESERVED_IDS = new Set([
 ]);
 
 const GLOBAL_ATTRIBUTES = new Set([
-	"class", "dir", "id", "lang", "role", "tabindex", "title", "aria-label", "aria-hidden", "aria-pressed",
+	"class", "dir", "id", "lang", "role", "tabindex", "title", "aria-label", "aria-hidden", "aria-pressed", "aria-live", "aria-atomic",
 ]);
 
 const ELEMENT_ATTRIBUTES: Record<string, Set<string>> = {
@@ -279,7 +279,10 @@ export function auditExplainContent(content: string): ExplainAuditResult {
 
 			// Link target 安全性
 			if (name === "a" && attrName === "target") {
-				if (attrVal === "_blank") {
+				const targetVal = attrVal.toLowerCase();
+				if (!["_blank", "_self"].includes(targetVal)) {
+					add("error", "invalid-link-target", 'Link target must be "_blank" or "_self".');
+				} else if (targetVal === "_blank") {
 					const rel = (attrs.get("rel") ?? "").toLowerCase().split(/\s+/);
 					if (!rel.includes("noopener")) {
 						add("error", "unsafe-link-target", 'Links with target="_blank" must include rel="noopener".');
@@ -298,6 +301,7 @@ export function auditExplainContent(content: string): ExplainAuditResult {
 		const id = attrs.get("id");
 		if (id) {
 			if (RESERVED_IDS.has(id)) add("error", "reserved-id", `ID #${id} is reserved by the explain shell.`);
+			if (!stableToken(id)) add("error", "invalid-id", `ID "${id}" must be a stable ASCII identifier.`);
 			ids.set(id, (ids.get(id) || 0) + 1);
 		}
 
@@ -343,10 +347,12 @@ export function auditExplainContent(content: string): ExplainAuditResult {
 		}
 	}
 
-	// 校验类比卡片必须包含类比失效说明
+	// 校验类比卡片必须包含类比文本和失效说明
 	for (const analogy of analogyNodes) {
-		if (!findDescendantByClass(analogy, "breakage-note")) {
-			add("error", "analogy-breakage", "Each .analogy-card must contain a .breakage-note explaining where the analogy breaks down.");
+		const hasText = findDescendantByClass(analogy, "analogy-text");
+		const hasBreakage = findDescendantByClass(analogy, "breakage-note");
+		if (!hasText || !hasBreakage) {
+			add("error", "analogy-anatomy", "Each .analogy-card must contain both .analogy-text and .breakage-note descendants.");
 		}
 	}
 

@@ -101,17 +101,27 @@ describe('explain design system sources', () => {
     const withStyle = '<section class="explain-hero" id="hero"><h1>Title</h1></section><p style="color:red">styled</p>';
     assert.ok(auditExplainContent(withStyle).errors.some((e) => e.code === 'forbidden-style'));
 
-    // 4. Target _blank without rel="noopener" is blocked
+    // 4. Target _blank without rel="noopener" is blocked (including case-insensitive _BLANK)
     const withBlankTarget = '<section class="explain-hero" id="hero"><h1>Title</h1></section><p><a href="https://example.com" target="_blank">link</a></p>';
     assert.ok(auditExplainContent(withBlankTarget).errors.some((e) => e.code === 'unsafe-link-target'));
+    const withCaseBlankTarget = '<section class="explain-hero" id="hero"><h1>Title</h1></section><p><a href="https://example.com" target="_BLANK">link</a></p>';
+    assert.ok(auditExplainContent(withCaseBlankTarget).errors.some((e) => e.code === 'unsafe-link-target'));
 
-    // 5. Deep nesting exceeds max depth
+    // 5. Invalid non-ASCII ID is blocked
+    const withBadId = '<section class="explain-hero" id="hero"><h1>Title</h1></section><div id="bad id">text</div>';
+    assert.ok(auditExplainContent(withBadId).errors.some((e) => e.code === 'invalid-id'));
+
+    // 6. Analogy-card without analogy-text is blocked
+    const incompleteAnalogy = '<section class="explain-hero" id="hero"><h1>Title</h1></section><div class="analogy-card"><div class="breakage-note">note</div></div>';
+    assert.ok(auditExplainContent(incompleteAnalogy).errors.some((e) => e.code === 'analogy-anatomy'));
+
+    // 7. Deep nesting exceeds max depth
     let deep = '<span>deep</span>';
     for (let i = 0; i < 140; i += 1) deep = `<div>${deep}</div>`;
     const withDeep = `<section class="explain-hero" id="hero"><h1>Title</h1></section>${deep}`;
     assert.ok(auditExplainContent(withDeep).errors.some((e) => e.code === 'fragment-too-complex'));
 
-    // 6. Valid explain template audits with 0 errors
+    // 8. Valid explain template with aria-live audits with 0 errors
     const valid = `
       <section class="explain-hero" id="hero">
         <div class="tag-row"><span class="pill primary">初级</span></div>
@@ -121,7 +131,7 @@ describe('explain design system sources', () => {
       <section id="layer-core" class="layer-block">
         <div class="layer-tag">01 · 核心</div>
         <h2>原理说明</h2>
-        <div class="layer-body"><p>正文内容。</p></div>
+        <div class="layer-body" aria-live="polite"><p>正文内容。</p></div>
       </section>
     `;
     const res = auditExplainContent(valid);
