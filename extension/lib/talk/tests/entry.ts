@@ -648,6 +648,10 @@ test("explain: renders through the explain pipeline end to end", async () => {
 	ok(res.ok, `render ok: ${res.message}`);
 	const audit = (res.details as { audit?: { errors: unknown[]; warnings: unknown[] } })?.audit;
 	eq(audit?.errors.length ?? -1, 0, "fragment explain audit has zero errors");
+	const serverHtml = rt.server?.getState("main")?.html ?? "";
+	ok(serverHtml.includes("Content-Security-Policy"), "explain document must include Content-Security-Policy meta");
+	ok(/script-src\s+(&#39;|\x27)sha256-/.test(serverHtml), "explain document CSP must include script hashes");
+	ok(serverHtml.includes('id="explain-runtime"'), "explain document must include explain-runtime");
 	await stopSession(rt);
 });
 
