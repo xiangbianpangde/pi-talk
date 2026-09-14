@@ -39,11 +39,12 @@ export interface TalkStyleManifest {
 	/** Preferred default / base style for new /talk sessions. */
 	default?: boolean;
 	/**
-	 * Governance profile applied by the engine. Currently "report" opts the
-	 * style into the strict report design-system audit + hash-CSP pipeline;
+	 * Governance profile applied by the engine. "report" opts the style into
+	 * the strict report design-system audit + hash-CSP pipeline; "explain" opts
+	 * into the dedicated pedagogical explain-audit + hash-CSP pipeline;
 	 * absent → advisory lint only. Decouples governance from style ids.
 	 */
-	governance?: "report" | string;
+	governance?: "report" | "explain" | string;
 	/** Short "when to use this style" hint surfaced in pickers and the system appendix. */
 	useWhen?: string;
 }

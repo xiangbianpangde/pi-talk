@@ -65,17 +65,21 @@
       }
     }
 
-    // 校验类比卡片必须包含直接子项 .analogy-text 且紧跟 .breakage-note
+    // 校验类比卡片必须包含恰好一个直接子项 .analogy-text 且紧邻跟随恰好一个 .breakage-note
     root.querySelectorAll('.analogy-card').forEach(function (node, index) {
       var directElements = Array.prototype.filter.call(node.children, function (el) { return el.nodeType === 1; });
-      var textIndex = -1;
-      var breakageIndex = -1;
+      var textIndices = [];
+      var breakageIndices = [];
       for (var i = 0; i < directElements.length; i += 1) {
-        if (directElements[i].classList.contains('analogy-text')) textIndex = i;
-        if (directElements[i].classList.contains('breakage-note')) breakageIndex = i;
+        if (directElements[i].classList.contains('analogy-text')) textIndices.push(i);
+        if (directElements[i].classList.contains('breakage-note')) breakageIndices.push(i);
       }
-      if (textIndex === -1 || breakageIndex === -1 || breakageIndex < textIndex) {
-        errors.push('第 ' + (index + 1) + ' 个 .analogy-card 必须包含直接子元素 .analogy-text 且紧跟 .breakage-note。');
+      if (
+        textIndices.length !== 1 ||
+        breakageIndices.length !== 1 ||
+        breakageIndices[0] !== textIndices[0] + 1
+      ) {
+        errors.push('第 ' + (index + 1) + ' 个 .analogy-card 必须包含恰好一个直接子元素 .analogy-text 且紧邻跟随恰好一个 .breakage-note。');
       }
     });
 
@@ -83,6 +87,21 @@
     root.querySelectorAll('button').forEach(function (node) {
       if (!node.textContent.trim() && !node.getAttribute('aria-label')) {
         warnings.push('按钮缺少文本或 aria-label。');
+      }
+    });
+
+    // 校验链接安全性与 target
+    root.querySelectorAll('a[href]').forEach(function (node) {
+      var href = (node.getAttribute('href') || '').toLowerCase().trim();
+      if (href.indexOf('javascript:') === 0 || href.indexOf('vbscript:') === 0) {
+        errors.push('发现不安全的 URL scheme: ' + href);
+      }
+      var target = (node.getAttribute('target') || '').toLowerCase();
+      if (target === '_blank') {
+        var rel = (node.getAttribute('rel') || '').toLowerCase();
+        if (rel.indexOf('noopener') === -1) {
+          errors.push('target="_blank" 链接缺少 rel="noopener"。');
+        }
       }
     });
 

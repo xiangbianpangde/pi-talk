@@ -569,7 +569,7 @@ export function buildTemplateVars(opts: {
 		return typeof v === "string" ? v : String(v);
 	};
 	const rawTitle = opts.title || str("title") || opts.styleId;
-	const reportText = (value: string): string => opts.styleId === "report" ? escapeHtml(value) : value;
+	const safeText = (value: string): string => escapeHtml(value);
 	// Defaults tuned for the academic report pack; harmless for other templates.
 	const rawMark = str("mark", rawTitle.slice(0, 1) || "报");
 	const rawBrand = str("brand", rawTitle);
@@ -579,11 +579,11 @@ export function buildTemplateVars(opts: {
 	const vars: Record<string, string> = {
 		content: opts.content,
 		body: opts.content,
-		title: reportText(rawTitle),
+		title: safeText(rawTitle),
 		styleId: opts.styleId,
-		mark: reportText(rawMark),
-		brand: reportText(rawBrand),
-		subtitle: reportText(rawSubtitle),
+		mark: safeText(rawMark),
+		brand: safeText(rawBrand),
+		subtitle: safeText(rawSubtitle),
 		meta: metaHtml,
 		nav,
 	};
@@ -713,17 +713,50 @@ export async function renderTalk(
 				? input.meta.surface
 				: runtime.activeSurface;
 
-	// Incremental DOM patch: bypasses full-document render (no audit, no new version)
+	const isReport = governedAsReport(style);
+	const isExplain = governedAsExplain(style);
+	const governed = isReport || isExplain;
+
+	// Incremental DOM patch: governed surfaces require safety audit on patch.html
 	const patch: TalkPatch | undefined =
 		input.patch ??
 		(typeof input.meta?.patch === "object" && input.meta.patch !== null
 			? (input.meta.patch as TalkPatch)
 			: undefined);
 	if (patch) {
+		let patchHtml = patch.html;
+		if (patch.method !== "remove" && typeof patchHtml === "string") {
+			if (isExplain) {
+				const audit = auditExplainContent(patchHtml);
+				if (!audit.valid) {
+					return {
+						ok: false,
+						styleId: style.id,
+						kind: style.kind,
+						message: `Explain patch rejected by safety gate. ${formatExplainAudit(audit)}`,
+						details: { audit, patch: true },
+					};
+				}
+				patchHtml = audit.normalizedHtml;
+			} else if (isReport) {
+				const audit = auditReportContent(patchHtml, { requireStructure: false });
+				if (!audit.valid) {
+					return {
+						ok: false,
+						styleId: style.id,
+						kind: style.kind,
+						message: `Report patch rejected by safety gate. ${formatReportAudit(audit)}`,
+						details: { audit, patch: true },
+					};
+				}
+				patchHtml = audit.normalizedHtml;
+			}
+		}
+
 		const server = await ensureServer(runtime);
 		const result = server.applyPatch({
 			selector: patch.selector,
-			html: patch.html,
+			html: patchHtml,
 			method: patch.method,
 			surface: patch.surface || targetSurface,
 		});
@@ -762,9 +795,6 @@ export async function renderTalk(
 
 	let renderContent = input.content;
 	let renderMeta = input.meta ? { ...input.meta } : undefined;
-	const isReport = governedAsReport(style);
-	const isExplain = governedAsExplain(style);
-	const governed = isReport || isExplain;
 	const reportAudit = isReport ? auditReportContent(input.content) : undefined;
 	const explainAudit = isExplain ? auditExplainContent(input.content) : undefined;
 

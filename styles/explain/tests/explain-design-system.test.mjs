@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, it } from 'node:test';
@@ -116,6 +116,10 @@ describe('explain design system sources', () => {
     assert.ok(auditExplainContent(incompleteAnalogy).errors.some((e) => e.code === 'analogy-anatomy'));
     const wrappedAnalogy = '<section class="explain-hero" id="hero"><h1>Title</h1></section><div class="analogy-card"><div class="analogy-text">a</div><div class="wrapper"><div class="breakage-note">b</div></div></div>';
     assert.ok(auditExplainContent(wrappedAnalogy).errors.some((e) => e.code === 'analogy-anatomy'), 'expected analogy-anatomy on nested wrapper');
+    const interveningAnalogy = '<section class="explain-hero" id="hero"><h1>Title</h1></section><div class="analogy-card"><div class="analogy-text">a</div><span>extra</span><div class="breakage-note">b</div></div>';
+    assert.ok(auditExplainContent(interveningAnalogy).errors.some((e) => e.code === 'analogy-anatomy'), 'expected analogy-anatomy on intervening sibling');
+    const duplicateAnalogyText = '<section class="explain-hero" id="hero"><h1>Title</h1></section><div class="analogy-card"><div class="analogy-text">a</div><div class="breakage-note">b</div><div class="analogy-text">c</div></div>';
+    assert.ok(auditExplainContent(duplicateAnalogyText).errors.some((e) => e.code === 'analogy-anatomy'), 'expected analogy-anatomy on duplicate text');
 
     // 7. Deep nesting exceeds max depth
     let deep = '<span>deep</span>';
@@ -138,5 +142,45 @@ describe('explain design system sources', () => {
     `;
     const res = auditExplainContent(valid);
     assert.equal(res.errors.length, 0, `valid template errors: ${JSON.stringify(res.errors)}`);
+  });
+
+  it('escapes explain shell text slots (title/brand/subtitle) to prevent shell breakout', async () => {
+    const { build } = await import('file://' + join(process.env.HOME ?? '', '.pi', 'agent', 'npm', 'node_modules', 'esbuild', 'lib', 'main.js'));
+    const { tmpdir } = await import('node:os');
+    const out = join(tmpdir(), `test-session-vars-${Date.now()}.mjs`);
+    const sessionPath = [
+      join(root, '../../extension/lib/talk/session.ts'),
+      join(root, '../../../extensions/lib/talk/session.ts'),
+      join(process.env.HOME ?? '', '.pi/agent/extensions/lib/talk/session.ts'),
+    ].find((c) => existsSync(c));
+    const parse5Path = join(process.env.HOME ?? '', '.pi', 'agent', 'npm', 'node_modules', 'parse5', 'dist', 'index.js');
+
+    assert.ok(sessionPath && existsSync(sessionPath), 'session.ts must exist');
+
+    await build({
+      entryPoints: [sessionPath],
+      bundle: true,
+      platform: 'node',
+      format: 'esm',
+      outfile: out,
+      absWorkingDir: dirname(sessionPath),
+      plugins: [{
+        name: 'resolve-parse5',
+        setup(b) { b.onResolve({ filter: /parse5/ }, () => ({ path: parse5Path })); },
+      }],
+      logLevel: 'silent',
+    });
+
+    const { buildTemplateVars } = await import('file://' + out);
+    const hostileTitle = '</title><script>alert(1)</script><img src=x onerror=pwn()>';
+    const vars = buildTemplateVars({
+      content: '<p>content</p>',
+      title: hostileTitle,
+      styleId: 'explain',
+    });
+
+    assert.doesNotMatch(vars.title, /<script/i, 'title must not contain raw unescaped script');
+    assert.doesNotMatch(vars.title, /<\/title>/i, 'title must not contain raw unescaped </title>');
+    assert.match(vars.title, /&lt;\/title&gt;/, 'title must be HTML-escaped');
   });
 });

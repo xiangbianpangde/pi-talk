@@ -347,13 +347,21 @@ export function auditExplainContent(content: string): ExplainAuditResult {
 		}
 	}
 
-	// 校验类比卡片必须包含直接子项 .analogy-text 且其后紧跟 .breakage-note
+	// 校验类比卡片必须包含恰好一个直接子项 .analogy-text 且紧邻跟随恰好一个 .breakage-note
 	for (const analogy of analogyNodes) {
 		const directElements = (analogy.childNodes ?? []).filter(isElement);
-		const textIndex = directElements.findIndex((child: HtmlNode) => classesOf(child).has("analogy-text"));
-		const breakageIndex = directElements.findIndex((child: HtmlNode) => classesOf(child).has("breakage-note"));
-		if (textIndex === -1 || breakageIndex === -1 || breakageIndex < textIndex) {
-			add("error", "analogy-anatomy", "Each .analogy-card must contain direct child .analogy-text followed by .breakage-note.");
+		const textIndices: number[] = [];
+		const breakageIndices: number[] = [];
+		for (let i = 0; i < directElements.length; i += 1) {
+			if (classesOf(directElements[i]).has("analogy-text")) textIndices.push(i);
+			if (classesOf(directElements[i]).has("breakage-note")) breakageIndices.push(i);
+		}
+		if (
+			textIndices.length !== 1 ||
+			breakageIndices.length !== 1 ||
+			breakageIndices[0] !== textIndices[0] + 1
+		) {
+			add("error", "analogy-anatomy", "Each .analogy-card must contain exactly one direct child .analogy-text immediately followed by exactly one .breakage-note.");
 		}
 	}
 
