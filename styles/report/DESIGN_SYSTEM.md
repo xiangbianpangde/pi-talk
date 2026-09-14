@@ -104,12 +104,12 @@ Executive summary → KPI/status → evidence → comparison or risks → timeli
 | Section | `section[id].sec-head[data-nav-title]` | navigable chapters |
 | KPI | `.kpi > .num + .lbl` (`.sub` optional) | a small set of decision-relevant metrics tied to real entities |
 | Card | `.card > h3 + content` | context or grouped reasoning |
-| Hypothesis | `.hypothesis > .hypo-tag + (h3\|h4) + .hypo-body > .hypo-row` | scientific hypotheses with premise, prediction, and mechanism |
-| Formula wrap | `.formula-wrap > .formula-math + .formula-vars > .var-item` | mathematical objectives with variable semantics table |
+| Hypothesis | `.hypothesis` (direct children: `.hypo-tag`, `h3\|h4`, `.hypo-body > .hypo-row`) | scientific hypotheses with premise, prediction, and mechanism |
+| Formula wrap | `.formula-wrap` (direct children: `.formula-math`, `.formula-vars > .var-item`) | mathematical objectives with variable semantics table |
 | Evidence table | `.tbl-wrap > table` with caption and scoped headers | problem-to-mechanism mappings and traceable comparisons |
 | Ablation matrix | `.tbl-wrap > table.ablation-table` | controlled group comparisons and component ablation deltas |
-| Boundary box | `.boundary-box > .boundary-head + .grid > .boundary-item` | honest negative results, failure conditions, and limitations |
-| Discovery card | `.card.discovery > .disc-badge + (h3\|h4) + p + .vs-compact > .v-col` | empirical insights and counter-intuitive observations |
+| Boundary box | `.boundary-box` (direct children: `.boundary-head`, `.grid > .boundary-item`) | honest negative results, failure conditions, and limitations |
+| Discovery card | `.card.discovery` (direct children: `.disc-badge`, `h3\|h4`, `p`, `.vs-compact > .v-col`) | empirical insights and counter-intuitive observations |
 | Sample badge | `.sample-pill.(field\|sim\|stat\|warn)` | sample scale (N=...), environment, and statistical significance |
 | Note | `.note.(info\|warn\|crit\|good)` | caveat or bounded callout |
 | Compare | `.vs > .vs-col.old + .vs-mid + .vs-col.new` | before/after dilemma vs upgrade contrast |

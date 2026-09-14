@@ -183,4 +183,51 @@ describe('explain design system sources', () => {
     assert.doesNotMatch(vars.title, /<\/title>/i, 'title must not contain raw unescaped </title>');
     assert.match(vars.title, /&lt;\/title&gt;/, 'title must be HTML-escaped');
   });
+
+  it('supports partial subtree patches while enforcing safety gates', async () => {
+    const { build } = await import('file://' + join(process.env.HOME ?? '', '.pi', 'agent', 'npm', 'node_modules', 'esbuild', 'lib', 'main.js'));
+    const { tmpdir } = await import('node:os');
+    const out = join(tmpdir(), `test-patch-audit-${Date.now()}.mjs`);
+    const serverAuditPath = [
+      join(root, '../../extension/lib/talk/explain-audit.ts'),
+      join(root, '../../../extensions/lib/talk/explain-audit.ts'),
+      join(process.env.HOME ?? '', '.pi/agent/extensions/lib/talk/explain-audit.ts'),
+    ].find((c) => existsSync(c));
+    const parse5Path = join(process.env.HOME ?? '', '.pi', 'agent', 'npm', 'node_modules', 'parse5', 'dist', 'index.js');
+
+    await build({
+      entryPoints: [serverAuditPath],
+      bundle: true,
+      platform: 'node',
+      format: 'esm',
+      outfile: out,
+      absWorkingDir: dirname(serverAuditPath),
+      plugins: [{
+        name: 'resolve-parse5',
+        setup(b) { b.onResolve({ filter: /parse5/ }, () => ({ path: parse5Path })); },
+      }],
+      logLevel: 'silent',
+    });
+
+    const { auditExplainContent } = await import('file://' + out);
+
+    // Partial safe patches pass cleanly with requireStructure: false
+    const safeP = '<p>new content</p>';
+    const safePRes = auditExplainContent(safeP, { requireStructure: false });
+    assert.equal(safePRes.errors.length, 0, 'safe partial paragraph should pass');
+
+    const safeBtn = '<button type="button" class="choice-btn" data-talk-event="explain-check" data-talk-value="a::b">Choice</button>';
+    const safeBtnRes = auditExplainContent(safeBtn, { requireStructure: false });
+    assert.equal(safeBtnRes.errors.length, 0, 'safe partial button should pass');
+
+    // Unsafe patches are strictly blocked even with requireStructure: false
+    const maliciousScript = '<p><script>alert(1)</script></p>';
+    assert.ok(auditExplainContent(maliciousScript, { requireStructure: false }).errors.some((e) => e.code === 'forbidden-element'));
+
+    const maliciousJsUrl = '<p><a href="javascript:alert(1)">evil</a></p>';
+    assert.ok(auditExplainContent(maliciousJsUrl, { requireStructure: false }).errors.some((e) => e.code === 'unsafe-url'));
+
+    const forbiddenDetails = '<details><summary>hide</summary><p>secret</p></details>';
+    assert.ok(auditExplainContent(forbiddenDetails, { requireStructure: false }).errors.some((e) => e.code === 'forbidden-details'));
+  });
 });

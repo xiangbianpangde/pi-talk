@@ -240,5 +240,38 @@ describe('report design system sources', () => {
     // Discovery card with badge + heading + vs-compact but missing p or missing v-col
     const hollowDisc = '<article class="card discovery"><div class="disc-badge">FINDING</div><h3>Title</h3><div class="vs-compact">no columns</div></article>';
     assert.ok(auditReportContent(hollowDisc, { requireStructure: false }).errors.some((e) => e.code === 'discovery-anatomy'));
+
+    // 3. Wrong-parent / misplaced child errors (child must be inside designated container)
+    const wrongParentHypo = '<article class="hypothesis"><div class="hypo-tag">[H]</div><h3>Title</h3><div class="hypo-body"></div><div class="hypo-row">outside</div></article>';
+    assert.ok(auditReportContent(wrongParentHypo, { requireStructure: false }).errors.some((e) => e.code === 'hypothesis-anatomy'));
+
+    const wrongParentFormula = '<div class="formula-wrap"><div class="formula-math">x = 1</div><div class="formula-vars"></div><div class="var-item">outside</div></div>';
+    assert.ok(auditReportContent(wrongParentFormula, { requireStructure: false }).errors.some((e) => e.code === 'formula-anatomy'));
+
+    const wrongParentBoundary = '<div class="boundary-box"><div class="boundary-head"><h4>Title</h4></div><div class="grid"></div><div class="boundary-item">outside</div></div>';
+    assert.ok(auditReportContent(wrongParentBoundary, { requireStructure: false }).errors.some((e) => e.code === 'boundary-anatomy'));
+
+    const wrongParentDisc = '<article class="card discovery"><div class="disc-badge">FINDING</div><h3>Title</h3><p>desc</p><div class="vs-compact"></div><div class="v-col">outside</div></article>';
+    assert.ok(auditReportContent(wrongParentDisc, { requireStructure: false }).errors.some((e) => e.code === 'discovery-anatomy'));
+
+    // 4. Nested wrapper / non-direct child errors
+    const nestedWrapperHypo = '<article class="hypothesis"><div class="hypo-tag">[H]</div><h3>Title</h3><div class="hypo-body"><div class="other"><div class="hypo-row">nested</div></div></div></article>';
+    assert.ok(auditReportContent(nestedWrapperHypo, { requireStructure: false }).errors.some((e) => e.code === 'hypothesis-anatomy'));
+
+    const nestedWrapperFormula = '<div class="formula-wrap"><div class="formula-math">x = 1</div><div class="formula-vars"><div class="other"><div class="var-item">nested</div></div></div></div>';
+    assert.ok(auditReportContent(nestedWrapperFormula, { requireStructure: false }).errors.some((e) => e.code === 'formula-anatomy'));
+
+    const nestedWrapperBoundary = '<div class="boundary-box"><div class="boundary-head"><h4>Title</h4></div><div class="grid"><div class="other"><div class="boundary-item">nested</div></div></div></div>';
+    assert.ok(auditReportContent(nestedWrapperBoundary, { requireStructure: false }).errors.some((e) => e.code === 'boundary-anatomy'));
+
+    const nestedWrapperDisc = '<article class="card discovery"><div class="disc-badge">FINDING</div><h3>Title</h3><p>desc</p><div class="vs-compact"><div class="other"><div class="v-col">nested</div></div></div></article>';
+    assert.ok(auditReportContent(nestedWrapperDisc, { requireStructure: false }).errors.some((e) => e.code === 'discovery-anatomy'));
+
+    // 5. Invalid heading levels (must be h3 or h4, not h2 or h5)
+    const h2Hypo = '<article class="hypothesis"><div class="hypo-tag">[H]</div><h2>Invalid H2</h2><div class="hypo-body"><div class="hypo-row">row</div></div></article>';
+    assert.ok(auditReportContent(h2Hypo, { requireStructure: false }).errors.some((e) => e.code === 'hypothesis-anatomy'));
+
+    const h2Disc = '<article class="card discovery"><div class="disc-badge">FINDING</div><h2>Invalid H2</h2><p>desc</p><div class="vs-compact"><div class="v-col">col</div></div></article>';
+    assert.ok(auditReportContent(h2Disc, { requireStructure: false }).errors.some((e) => e.code === 'discovery-anatomy'));
   });
 });

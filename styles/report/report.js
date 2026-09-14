@@ -512,31 +512,42 @@
       if (!node.querySelector('.num') || !node.querySelector('.lbl')) warnings.push('第 ' + (index + 1) + ' 个 KPI 缺少 .num 或 .lbl。');
     });
     root.querySelectorAll('.hypothesis').forEach(function (node, index) {
-      var hasHeading = !!node.querySelector('h2,h3,h4,h5,h6');
-      var hasHypoRow = !!node.querySelector('.hypo-row');
-      if (!node.querySelector('.hypo-tag') || !hasHeading || !node.querySelector('.hypo-body') || !hasHypoRow) {
-        warnings.push('第 ' + (index + 1) + ' 个 .hypothesis 缺少 .hypo-tag、标题、.hypo-body 或 .hypo-row。');
+      var directElements = Array.prototype.filter.call(node.children, function (el) { return el.nodeType === 1; });
+      var hasTag = directElements.some(function (c) { return c.classList.contains('hypo-tag'); });
+      var hasHeading = directElements.some(function (c) { return c.tagName === 'H3' || c.tagName === 'H4'; });
+      var body = directElements.find(function (c) { return c.classList.contains('hypo-body'); });
+      var hasRow = body ? Array.prototype.filter.call(body.children, function (el) { return el.nodeType === 1; }).some(function (c) { return c.classList.contains('hypo-row'); }) : false;
+      if (!hasTag || !hasHeading || !body || !hasRow) {
+        warnings.push('第 ' + (index + 1) + ' 个 .hypothesis 缺少直接子元素 .hypo-tag、标题(h3/h4)、或包含直接 .hypo-row 的 .hypo-body。');
       }
     });
     root.querySelectorAll('.formula-wrap').forEach(function (node, index) {
-      var hasVarItem = !!node.querySelector('.var-item');
-      if (!node.querySelector('.formula-math') || !node.querySelector('.formula-vars') || !hasVarItem) {
-        warnings.push('第 ' + (index + 1) + ' 个 .formula-wrap 缺少 .formula-math 或包含 .var-item 的 .formula-vars。');
+      var directElements = Array.prototype.filter.call(node.children, function (el) { return el.nodeType === 1; });
+      var hasMath = directElements.some(function (c) { return c.classList.contains('formula-math'); });
+      var vars = directElements.find(function (c) { return c.classList.contains('formula-vars'); });
+      var hasItem = vars ? Array.prototype.filter.call(vars.children, function (el) { return el.nodeType === 1; }).some(function (c) { return c.classList.contains('var-item'); }) : false;
+      if (!hasMath || !vars || !hasItem) {
+        warnings.push('第 ' + (index + 1) + ' 个 .formula-wrap 缺少直接子元素 .formula-math 或包含直接 .var-item 的 .formula-vars。');
       }
     });
     root.querySelectorAll('.boundary-box').forEach(function (node, index) {
-      var hasGrid = !!node.querySelector('.grid');
-      var hasItem = !!node.querySelector('.boundary-item');
-      if (!node.querySelector('.boundary-head') || !hasGrid || !hasItem) {
-        warnings.push('第 ' + (index + 1) + ' 个 .boundary-box 缺少 .boundary-head 或包含 .boundary-item 的 .grid。');
+      var directElements = Array.prototype.filter.call(node.children, function (el) { return el.nodeType === 1; });
+      var hasHead = directElements.some(function (c) { return c.classList.contains('boundary-head'); });
+      var grid = directElements.find(function (c) { return c.classList.contains('grid'); });
+      var hasItem = grid ? Array.prototype.filter.call(grid.children, function (el) { return el.nodeType === 1; }).some(function (c) { return c.classList.contains('boundary-item'); }) : false;
+      if (!hasHead || !grid || !hasItem) {
+        warnings.push('第 ' + (index + 1) + ' 个 .boundary-box 缺少直接子元素 .boundary-head 或包含直接 .boundary-item 的 .grid。');
       }
     });
     root.querySelectorAll('.card.discovery').forEach(function (node, index) {
-      var hasHeading = !!node.querySelector('h2,h3,h4,h5,h6');
-      var hasP = !!node.querySelector('p');
-      var hasVCol = !!node.querySelector('.v-col');
-      if (!node.querySelector('.disc-badge') || !hasHeading || !hasP || !node.querySelector('.vs-compact') || !hasVCol) {
-        warnings.push('第 ' + (index + 1) + ' 个 .card.discovery 缺少 .disc-badge、标题、p 或包含 .v-col 的 .vs-compact。');
+      var directElements = Array.prototype.filter.call(node.children, function (el) { return el.nodeType === 1; });
+      var hasBadge = directElements.some(function (c) { return c.classList.contains('disc-badge'); });
+      var hasHeading = directElements.some(function (c) { return c.tagName === 'H3' || c.tagName === 'H4'; });
+      var hasP = directElements.some(function (c) { return c.tagName === 'P'; });
+      var vs = directElements.find(function (c) { return c.classList.contains('vs-compact'); });
+      var hasCol = vs ? Array.prototype.filter.call(vs.children, function (el) { return el.nodeType === 1; }).some(function (c) { return c.classList.contains('v-col'); }) : false;
+      if (!hasBadge || !hasHeading || !hasP || !vs || !hasCol) {
+        warnings.push('第 ' + (index + 1) + ' 个 .card.discovery 缺少直接子元素 .disc-badge、标题(h3/h4)、p、或包含直接 .v-col 的 .vs-compact。');
       }
     });
     root.querySelectorAll('img').forEach(function (node) {

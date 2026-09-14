@@ -496,31 +496,46 @@ function auditReportContentUnsafe(
 		if (!hasDescendantClass(kpi, "num") || !hasDescendantClass(kpi, "lbl")) add("error", "kpi-anatomy", "Each .kpi must contain a .num and a .lbl descendant.");
 	}
 	for (const hypo of facts.hypotheses) {
-		const hasHeading = descendants(hypo).some((child) => isElement(child) && /^h[2-6]$/.test(child.tagName));
-		const hasHypoRow = hasDescendantClass(hypo, "hypo-row");
-		if (!hasDescendantClass(hypo, "hypo-tag") || !hasHeading || !hasDescendantClass(hypo, "hypo-body") || !hasHypoRow) {
-			add("error", "hypothesis-anatomy", "Each .hypothesis must contain .hypo-tag, a heading (h3/h4), and .hypo-body with at least one .hypo-row entry.");
+		const directElements = (hypo.childNodes ?? []).filter(isElement);
+		const hasTag = directElements.some((c: HtmlNode) => classesOf(c).has("hypo-tag"));
+		const hasHeading = directElements.some((c: HtmlNode) => /^h[34]$/.test(c.tagName));
+		const body = directElements.find((c: HtmlNode) => classesOf(c).has("hypo-body"));
+		const bodyChildren = body ? (body.childNodes ?? []).filter(isElement) : [];
+		const hasDirectRow = bodyChildren.some((c: HtmlNode) => classesOf(c).has("hypo-row"));
+		if (!hasTag || !hasHeading || !body || !hasDirectRow) {
+			add("error", "hypothesis-anatomy", "Each .hypothesis must contain direct child .hypo-tag, a heading (h3/h4), and .hypo-body with direct .hypo-row entries.");
 		}
 	}
 	for (const form of facts.formulas) {
-		const hasVarItem = hasDescendantClass(form, "var-item");
-		if (!hasDescendantClass(form, "formula-math") || !hasDescendantClass(form, "formula-vars") || !hasVarItem) {
-			add("error", "formula-anatomy", "Each .formula-wrap must contain .formula-math and .formula-vars with at least one .var-item entry.");
+		const directElements = (form.childNodes ?? []).filter(isElement);
+		const hasMath = directElements.some((c: HtmlNode) => classesOf(c).has("formula-math"));
+		const vars = directElements.find((c: HtmlNode) => classesOf(c).has("formula-vars"));
+		const varsChildren = vars ? (vars.childNodes ?? []).filter(isElement) : [];
+		const hasDirectItem = varsChildren.some((c: HtmlNode) => classesOf(c).has("var-item"));
+		if (!hasMath || !vars || !hasDirectItem) {
+			add("error", "formula-anatomy", "Each .formula-wrap must contain direct child .formula-math and .formula-vars with direct .var-item entries.");
 		}
 	}
 	for (const box of facts.boundaries) {
-		const hasGrid = hasDescendantClass(box, "grid");
-		const hasItem = hasDescendantClass(box, "boundary-item");
-		if (!hasDescendantClass(box, "boundary-head") || !hasGrid || !hasItem) {
-			add("error", "boundary-anatomy", "Each .boundary-box must contain .boundary-head and a .grid container with .boundary-item entries.");
+		const directElements = (box.childNodes ?? []).filter(isElement);
+		const hasHead = directElements.some((c: HtmlNode) => classesOf(c).has("boundary-head"));
+		const grid = directElements.find((c: HtmlNode) => classesOf(c).has("grid"));
+		const gridChildren = grid ? (grid.childNodes ?? []).filter(isElement) : [];
+		const hasDirectItem = gridChildren.some((c: HtmlNode) => classesOf(c).has("boundary-item"));
+		if (!hasHead || !grid || !hasDirectItem) {
+			add("error", "boundary-anatomy", "Each .boundary-box must contain direct child .boundary-head and a .grid container with direct .boundary-item entries.");
 		}
 	}
 	for (const disc of facts.discoveries) {
-		const hasHeading = descendants(disc).some((child) => isElement(child) && /^h[2-6]$/.test(child.tagName));
-		const hasP = descendants(disc).some((child) => isElement(child) && child.tagName === "p");
-		const hasVCol = hasDescendantClass(disc, "v-col");
-		if (!hasDescendantClass(disc, "disc-badge") || !hasHeading || !hasP || !hasDescendantClass(disc, "vs-compact") || !hasVCol) {
-			add("error", "discovery-anatomy", "Each .card.discovery must contain .disc-badge, a heading (h3/h4), a <p> description, and .vs-compact with .v-col comparison columns.");
+		const directElements = (disc.childNodes ?? []).filter(isElement);
+		const hasBadge = directElements.some((c: HtmlNode) => classesOf(c).has("disc-badge"));
+		const hasHeading = directElements.some((c: HtmlNode) => /^h[34]$/.test(c.tagName));
+		const hasP = directElements.some((c: HtmlNode) => c.tagName === "p");
+		const vs = directElements.find((c: HtmlNode) => classesOf(c).has("vs-compact"));
+		const vsChildren = vs ? (vs.childNodes ?? []).filter(isElement) : [];
+		const hasDirectCol = vsChildren.some((c: HtmlNode) => classesOf(c).has("v-col"));
+		if (!hasBadge || !hasHeading || !hasP || !vs || !hasDirectCol) {
+			add("error", "discovery-anatomy", "Each .card.discovery must contain direct child .disc-badge, a heading (h3/h4), a <p> description, and .vs-compact with direct .v-col comparison columns.");
 		}
 	}
 	validateTabSets(fragment, add);
