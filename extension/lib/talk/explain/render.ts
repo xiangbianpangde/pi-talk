@@ -1,11 +1,12 @@
 /**
- * Explanation Layer — compiler: `explain.ir/v1` → governed `report` fragment.
+ * Explanation Layer — compiler: `explain.ir/v1` → dedicated `explain` design system.
  *
- * There is no second visual system here. The plan is compiled into the existing
- * report design-system vocabulary (.hero / section[id].sec-head / .card /
- * .note / details.hook / .actions / .verdict) and published through
- * `renderTalk({ styleId: "report" })`, so it inherits the parse5 audit,
- * hash-CSP, talk_verify and export pipeline.
+ * Compiles a pedagogical ExplanationPlan into the `explain` visual vocabulary:
+ * .explain-hero / .layer-block / .analogy-card / .breakage-note / .check-card /
+ * .limits-block / .takeaway-block.
+ *
+ * 100% directly visible: strictly NO <details> folding, no accordion click-friction.
+ * Published through `renderTalk({ styleId: "explain" })`.
  *
  * Safety rule: every IR string is HTML-escaped *first*, then wrapped in trusted
  * markup. Explaining `<script>` or `onclick=` therefore renders as literal text
@@ -21,11 +22,10 @@ import {
 	EXPLAIN_KIND_LABEL,
 	type ExplanationPlan,
 	type UnderstandingCheck,
-} from "./types";
+} from "./types.js";
 
 export interface CompiledExplanation {
 	html: string;
-	/** Report meta slots to pass alongside the fragment (escaped text by the engine). */
 	meta: Record<string, string>;
 	sections: number;
 }
@@ -39,9 +39,7 @@ function escapeHtml(value: string): string {
 		.replace(/'/g, "&#39;");
 }
 
-/** Inline subset on already-escaped text: `code` and **bold** only.
- * Code spans are made opaque first (P3, Sol review): markdown inside a code
- * span — e.g. `**x**` — stays literal instead of being bolded. */
+/** Inline subset on already-escaped text: `code` and **bold** only. */
 function inlineMarkdown(escaped: string): string {
 	const codeSpans: string[] = [];
 	const masked = escaped.replace(/`([^`\n]+)`/g, (_m, code: string) => {
@@ -119,42 +117,35 @@ export function renderMarkdownLite(source: string): string {
 	if (fence) {
 		out.push(`<pre class="code-block"><code>${fence.map((l) => escapeHtml(l)).join("\n")}</code></pre>`);
 	}
-	flushParagraph();
 	flushList();
-	return out.join("\n");
+	flushParagraph();
+	return out.join("");
 }
 
-/**
- * Markdown-lite → plain text WITHOUT destroying technical characters
- * (v1 fix, Sol review: the old regex deleted # _ > globally, turning C# into C,
- * x > y into x y, snake_case into snakecase).
- *
- * Only paired delimiters are unwrapped (`code`, **bold**); fenced blocks are
- * dropped (code is rarely thesis material); line-leading markers are removed
- * and heading lines skipped. Ordinary prose keeps every character.
- */
-export function plainText(source: string): string {
-	const withoutFences = source
-		.replace(/```[\s\S]*?```/g, " ")
-		.replace(/`([^`]*)`/g, "$1")
-		.replace(/\*\*(.+?)\*\*/g, "$1")
-		.replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
-		.replace(/<(https?:\/\/[^>]+)>/g, "$1");
+export function plainText(markdown: string): string {
+	const lines = markdown.replace(/\r\n?/g, "\n").split("\n");
 	const proseLines: string[] = [];
-	for (const rawLine of withoutFences.split("\n")) {
-		const line = rawLine.trim();
-		if (!line) continue;
-		if (/^#{1,6}\s/.test(line)) continue; // heading line: not thesis material
-		proseLines.push(line.replace(/^(?:[-*+]|\d+[.)])\s+/, ""));
+	let inFence = false;
+	for (const line of lines) {
+		const trimmed = line.trim();
+		if (trimmed.startsWith("```")) {
+			inFence = !inFence;
+			continue;
+		}
+		if (inFence || !trimmed) continue;
+		const stripped = trimmed
+			.replace(/^[-*]\s+/, "")
+			.replace(/^\d+[.)]\s+/, "")
+			.replace(/`([^`\n]+)`/g, "$1")
+			.replace(/\*\*([^*\n]+)\*\*/g, "$1")
+			.trim();
+		if (stripped) proseLines.push(stripped);
 	}
 	return proseLines.join(" ").replace(/\s+/g, " ").trim();
 }
 
 /**
- * First sentence of the core layer, used as the hero thesis and the verdict.
- * Only fullwidth CJK terminators split without trailing whitespace; ASCII
- * .?! require following whitespace so URLs (…search?q=x。), ternaries
- * (ready?next:value) and x!.y survive intact (v1 fix, Sol round-3).
+ * First sentence of the core layer, used as the hero lead thesis and takeaway.
  */
 export function thesisOf(core: string): string {
 	const flat = plainText(core);
@@ -162,121 +153,109 @@ export function thesisOf(core: string): string {
 	return sentence.length > 140 ? `${sentence.slice(0, 139)}…` : sentence;
 }
 
-function noteBlock(tone: "warn" | "crit" | "info" | "good", icon: string, innerHtml: string): string {
-	return `<div class="note ${tone}"><div class="ico" aria-hidden="true">${icon}</div><div>${innerHtml}</div></div>`;
-}
-
-/** Compile a validated plan into a report body fragment. */
+/** Compile a validated plan into an explain design-system fragment. */
 export function compileExplanation(plan: ExplanationPlan): CompiledExplanation {
 	const parts: string[] = [];
 	const core = plan.layers.find((layer) => layer.kind === "core") ?? plan.layers[0];
 	const thesis = thesisOf(core.content);
-	// v1 fix (Sol review): afterLayerId is positional — each check renders
-	// immediately after its target layer, not in a detached section.
+
+	// Positional checks: render check card immediately after its target layer
 	const checksByLayer = new Map<string, UnderstandingCheck[]>();
 	for (const check of plan.checks ?? []) {
 		const list = checksByLayer.get(check.afterLayerId) ?? [];
 		list.push(check);
 		checksByLayer.set(check.afterLayerId, list);
 	}
+
 	const renderCheckCards = (layerId: string): string => {
 		const checks = checksByLayer.get(layerId);
 		if (!checks?.length) return "";
-		const cards = checks
+		return checks
 			.map((check) => {
 				const buttons = check.choices
 					.map(
 						(choice) =>
-							`<button type="button" data-talk-event="explain-check" data-talk-value="${escapeHtml(
+							`<button type="button" class="choice-btn" data-talk-event="explain-check" data-talk-value="${escapeHtml(
 								`${check.id}::${choice.id}`,
 							)}">${escapeHtml(choice.label)}</button>`,
 					)
 					.join("");
 				return [
-					`<article class="card hl">`,
-					`<h3>${escapeHtml(check.question)}</h3>`,
-					`<p class="text-small text-faint">选一个；答案由 agent 侧判断，页面不替你宣布对错。</p>`,
-					`<div class="actions">${buttons}</div>`,
-					`</article>`,
+					`<div class="check-card">`,
+					`<div class="check-prompt">${escapeHtml(check.question)}</div>`,
+					`<div class="check-sub">选一个选项进行理解验证；答案由 Agent 侧即时判断</div>`,
+					`<div class="choices-grid">${buttons}</div>`,
+					`</div>`,
 				].join("");
 			})
 			.join("");
-		return checks.length > 1 ? `<div class="grid g2 mt-1">${cards}</div>` : `<div class="mt-1">${cards}</div>`;
 	};
 
 	parts.push(
-		`<section id="hero" class="hero" data-nav-title="解释">`,
+		`<section class="explain-hero" id="hero">`,
 		`<div class="tag-row">`,
-		`<span class="b-pill inf">${escapeHtml(EXPLAIN_AUDIENCE_LABEL[plan.audience])}</span>`,
-		`<span class="b-pill br">${plan.layers.length} 层</span>`,
-		`<span class="b-pill mid">${plan.limitations.length} 条边界</span>`,
+		`<span class="pill primary">${escapeHtml(EXPLAIN_AUDIENCE_LABEL[plan.audience])}</span>`,
+		`<span class="pill brand">${plan.layers.length} 个解构层级</span>`,
+		`<span class="pill neutral">${plan.limitations.length} 条认知边界</span>`,
 		`</div>`,
 		`<h1>${escapeHtml(plan.topic)}</h1>`,
-		`<p class="sub">${inlineMarkdown(escapeHtml(thesis))}</p>`,
-		`<div class="meta-row"><span>Explanation IR v1</span><span>•</span><span>由浅到深，逐层展开</span></div>`,
+		`<p class="lead">${inlineMarkdown(escapeHtml(thesis))}</p>`,
+		`<div class="meta-row"><span>由浅入深 · 概念精解</span><span>•</span><span>全面平铺无折叠</span></div>`,
 		`</section>`,
 	);
 
 	plan.layers.forEach((layer, index) => {
 		const body = renderMarkdownLite(layer.content);
-		const inner: string[] = [];
-		if (layer.kind === "analogy" && layer.analogyBreakage) {
-			inner.push(
-				noteBlock(
-					"warn",
-					"≠",
-					`<b>类比在哪里失效</b>：${inlineMarkdown(escapeHtml(layer.analogyBreakage))}`,
-				),
-			);
-		}
-		const disclosure =
-			index === 0
-				? `<div class="mt-1">${body}${inner.join("")}</div>${renderCheckCards(layer.id)}`
-				: `<details class="hook"><summary>展开完整说明</summary><div class="body">${body}${inner.join("")}</div></details>${renderCheckCards(layer.id)}`;
 		parts.push(
-			`<section id="layer-${escapeHtml(layer.id)}" class="sec-head section-gap" data-nav-title="${escapeHtml(layer.title)}">`,
-			`<div class="tag">${String(index + 1).padStart(2, "0")} · ${escapeHtml(EXPLAIN_KIND_LABEL[layer.kind])}</div>`,
+			`<section id="layer-${escapeHtml(layer.id)}" class="layer-block">`,
+			`<div class="layer-tag">${String(index + 1).padStart(2, "0")} · ${escapeHtml(EXPLAIN_KIND_LABEL[layer.kind])}</div>`,
 			`<h2>${escapeHtml(layer.title)}</h2>`,
-			disclosure,
-			`</section>`,
 		);
+
+		if (layer.kind === "analogy") {
+			parts.push(
+				`<div class="analogy-card">`,
+				`<div class="analogy-text">${body}</div>`,
+				layer.analogyBreakage
+					? `<div class="breakage-note"><b>类比在哪里失效：</b>${inlineMarkdown(escapeHtml(layer.analogyBreakage))}</div>`
+					: "",
+				`</div>`,
+			);
+		} else {
+			parts.push(`<div class="layer-body">${body}</div>`);
+		}
+
+		const checkMarkup = renderCheckCards(layer.id);
+		if (checkMarkup) parts.push(checkMarkup);
+		parts.push(`</section>`);
 	});
 
 	parts.push(
-		`<section id="limitations" class="sec-head section-gap" data-nav-title="边界与限制">`,
-		`<div class="tag">L · LIMITS</div>`,
-		`<h2>这套解释在哪里失效</h2>`,
-		noteBlock(
-			"crit",
-			"!",
-			`<ul>${plan.limitations
-				.map((item) => `<li>${inlineMarkdown(escapeHtml(item))}</li>`)
-				.join("")}</ul>`,
-		),
+		`<section id="limitations" class="limits-block">`,
+		`<h3>这套解释在哪里失效（认知边界）</h3>`,
+		`<ul>${plan.limitations
+			.map((item) => `<li>${inlineMarkdown(escapeHtml(item))}</li>`)
+			.join("")}</ul>`,
 		`</section>`,
 	);
 
 	parts.push(
-		`<div class="verdict">`,
-		`<div class="lbl">记住这一句</div>`,
+		`<section class="takeaway-block">`,
+		`<div class="takeaway-lbl">TAKEAWAY · 核心心智</div>`,
 		`<h3>${inlineMarkdown(escapeHtml(thesis))}</h3>`,
 		`<p>${
 			plan.checks?.length
-				? "每层下面的理解检查答错了，就告诉我哪一层没懂——我会重讲那一层而不是重讲全部。"
-				: "想再深一层就点名要哪一层（机制 / 例子 / 代码 / 边界），我会重讲那一层而不是重讲全部。"
+				? "每层下面的理解检查答错了，告诉我哪一层没懂——我会针对性深入解析那一层。"
+				: "想再深一层探索机制或代码细节，随时直接向我提问。"
 		}</p>`,
-		`</div>`,
+		`</section>`,
 	);
 
 	return {
 		html: parts.join("\n"),
 		meta: {
-			mark: "解",
-			brand: plan.topic.slice(0, 24),
-			subtitle: `${EXPLAIN_AUDIENCE_LABEL[plan.audience]} · ${plan.layers.length} 层解释`,
-			meta: `${plan.layers.length} 层 · ${plan.limitations.length} 条边界${
-				plan.checks?.length ? ` · ${plan.checks.length} 个检查` : ""
-			}`,
+			title: plan.topic,
+			subtitle: `${EXPLAIN_AUDIENCE_LABEL[plan.audience]} · ${plan.layers.length} 层精解`,
 		},
 		sections: plan.layers.length + 1,
 	};

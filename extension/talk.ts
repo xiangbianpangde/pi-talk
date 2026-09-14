@@ -508,9 +508,9 @@ export default function (pi: ExtensionAPI) {
 		name: "talk_explain",
 		label: "Talk explain",
 		description:
-			"Validate an ExplanationPlan (explain.ir/v1) and render it as a governed /talk report: one-sentence core, layered progressive disclosure, mandatory analogy breakage, limitations block and optional understanding checks. Fails closed — invalid IR renders nothing.",
+			"Validate an ExplanationPlan (explain.ir/v1) and render it into the dedicated explain design system: single-column editorial layout, directly visible layers (core / mechanism / example / code / analogy), mandatory analogy breakage, limitations block and optional inline understanding checks. 100% directly visible with zero forced folding. Fails closed — invalid IR renders nothing.",
 		promptSnippet:
-			"Render layered explanations (ELI5 / mechanism / code / analogy) from an ExplanationPlan into the governed report surface",
+			"Render layered explanations (ELI5 / mechanism / code / analogy) from an ExplanationPlan into the dedicated explain surface",
 		promptGuidelines: [
 			"Use talk_explain when the explanation needs layers or visuals (解释一下/我没懂/用大白话讲/给新人介绍); a two-sentence answer stays in plain text.",
 			"talk_explain fails closed: fix every reported error before retrying, and never rebuild the same page by hand in html-interactive.",
@@ -546,7 +546,7 @@ export default function (pi: ExtensionAPI) {
 			const compiled = compileExplanation(validation.plan);
 			const result = await renderTalk(
 				{
-					styleId: "report",
+					styleId: "explain",
 					content: compiled.html,
 					meta: compiled.meta,
 					title: params.title || validation.plan.topic,

@@ -10,6 +10,7 @@ yarn-error.log*
 # Runtime
 *.jsonl
 sessions/
+.pi/
 
 # Build artifacts
 dist/
@@ -17,8 +18,10 @@ dist/
 !extension/lib/talk/arch-render.mjs
 !extension/lib/talk/tests/run-tests.mjs
 !styles/report/tests/report-design-system.test.mjs
+!styles/explain/tests/explain-design-system.test.mjs
 !styles/showcase/tests/showcase.test.mjs
 !styles/report/build.mjs
+!styles/explain/build.mjs
 !styles/report/report.js
 
 # Editor

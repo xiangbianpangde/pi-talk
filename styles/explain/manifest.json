@@ -1,0 +1,22 @@
+{
+  "id": "explain",
+  "name": "Explain 概念精解 · Explanation Design System",
+  "description": "/talk 专属概念解构与技术精解样式。单栏沉浸阅读（66~72ch）、100% 平铺直陈、零强制折叠、直觉类比、机理链条、代码走读与轻量理解自测。",
+  "kind": "html-js",
+  "entry": "index.html",
+  "default": false,
+  "capabilities": [
+    "html",
+    "js",
+    "pedagogy",
+    "explanation",
+    "design-system",
+    "browser",
+    "responsive",
+    "accessible",
+    "print",
+    "zh"
+  ],
+  "version": "1.0.0",
+  "governance": "explain"
+}

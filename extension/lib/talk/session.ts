@@ -27,6 +27,7 @@ import {
 } from "./registry";
 import { DEFAULT_TALK_STYLE_ID } from "./types";
 import { auditAssembledReportDocument, auditReportContent, formatReportAudit, type ReportAuditResult } from "./report-audit";
+import { auditExplainContent, formatExplainAudit, type ExplainAuditResult } from "./explain-audit";
 import {
 	buildReportContentSecurityPolicy,
 	escapeHtml,
@@ -82,6 +83,11 @@ export interface TalkRuntime {
 /** Formal-report governance is declarative via manifest `governance: "report"`. */
 export function governedAsReport(style: TalkStyle | undefined): boolean {
 	return Boolean(style && (style.governance === "report" || style.id === "report"));
+}
+
+/** Explain governance is declarative via manifest `governance: "explain"`. */
+export function governedAsExplain(style: TalkStyle | undefined): boolean {
+	return Boolean(style && (style.governance === "explain" || style.id === "explain"));
 }
 
 function emptyRuntime(): TalkRuntime {
@@ -746,8 +752,11 @@ export async function renderTalk(
 
 	let renderContent = input.content;
 	let renderMeta = input.meta ? { ...input.meta } : undefined;
-	const governed = governedAsReport(style);
-	const reportAudit = governed ? auditReportContent(input.content) : undefined;
+	const isReport = governedAsReport(style);
+	const isExplain = governedAsExplain(style);
+	const reportAudit = isReport ? auditReportContent(input.content) : undefined;
+	const explainAudit = isExplain ? auditExplainContent(input.content) : undefined;
+
 	if (reportAudit) {
 		renderContent = reportAudit.normalizedHtml;
 		// Only these report variables are inserted as HTML. title/mark/brand/subtitle
@@ -768,15 +777,27 @@ export async function renderTalk(
 			}
 		}
 		reportAudit.valid = reportAudit.errors.length === 0;
+		if (!reportAudit.valid) {
+			return {
+				ok: false,
+				styleId: style.id,
+				kind: style.kind,
+				message: `Report content rejected by the design-system safety gate. ${formatReportAudit(reportAudit)}`,
+				details: { audit: reportAudit, reportAudit },
+			};
+		}
+	} else if (explainAudit) {
+		renderContent = explainAudit.normalizedHtml;
+		if (!explainAudit.valid) {
+			return {
+				ok: false,
+				styleId: style.id,
+				kind: style.kind,
+				message: `Explain content rejected by the explain safety gate. ${formatExplainAudit(explainAudit)}`,
+				details: { audit: explainAudit },
+			};
+		}
 	}
-	if (reportAudit && !reportAudit.valid) {
-		return {
-			ok: false,
-			styleId: style.id,
-			kind: style.kind,
-			message: `Report content rejected by the design-system safety gate. ${formatReportAudit(reportAudit)}`,
-			details: { audit: reportAudit },
-		};
 	}
 	runtime.styleId = style.id;
 	runtime.title = input.title || runtime.title || style.name;

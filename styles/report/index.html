@@ -21,6 +21,7 @@
     --accent:#2F5061;      /* teal — 学术辅色 */
     --accent-2:#3F6A82;
     --gold:#7B5A20;        /* accessible ochre for data emphasis */
+    --gold-text:#6A4B10;   /* AA/AAA-safe dark ochre for small mono text on warm backgrounds (>= 4.5:1) */
     --good:#3F6B3D;        --warn:#7A5713;  --bad:#9C3A2E;
     --code-bg:#26241F;     --code-fg:#E8E2D4;
     --shadow:0 16px 40px -28px rgba(60,40,20,.32);
@@ -112,6 +113,26 @@
   .card.gold{border-left:3px solid var(--gold)}
   .card.good{border-left:3px solid var(--good)}
   .card.crit{border-left:3px solid var(--bad)}
+  .card.discovery{
+    border-left:3px solid var(--gold);
+    background:radial-gradient(circle at top right, rgba(168,122,46,.08), transparent 60%), var(--panel);
+  }
+  .discovery .disc-badge{
+    display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);
+    font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;
+    color:var(--gold);margin-bottom:4px;
+  }
+  .discovery h3,.discovery h4{font-family:var(--serif);font-size:15px;margin:2px 0 8px}
+  .vs-compact{
+    display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px;
+    padding:10px 12px;background:var(--bg-soft);border-radius:8px;
+    font-size:12px;border:1px solid var(--line-soft);
+  }
+  .vs-compact .v-col b{
+    display:block;font-size:10.5px;font-family:var(--mono);color:var(--txt-faint);
+    text-transform:uppercase;margin-bottom:2px;
+  }
+  .vs-compact .v-col.hl b{color:var(--brand)}
   .card h3,.card h4{font:700 13.5px/1.45 var(--sans);margin:0 0 7px;display:block}
   .card p{font-size:12.4px}
   .card>:last-child{margin-bottom:0}
@@ -156,6 +177,66 @@
   .diagram .gl{color:var(--gold);font-weight:700}
   .diagram .cm{color:var(--txt-faint)}
 
+  /* —— 核心假设与机理卡片 —— */
+  .hypothesis{
+    display:block;min-width:0;
+    background:linear-gradient(180deg, var(--panel), var(--panel-2));
+    border:1px solid var(--line);border-left:4px double var(--brand);
+    border-radius:12px;padding:16px 20px;margin:14px 0;box-shadow:var(--shadow);
+  }
+  .hypothesis .hypo-tag{
+    display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);
+    font-size:10.5px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;
+    color:var(--brand);margin-bottom:6px;
+  }
+  .hypothesis h3,.hypothesis h4{
+    font-family:var(--serif);font-size:16px;font-weight:700;color:var(--txt);
+    margin:0 0 10px;line-height:1.35;
+  }
+  .hypothesis .hypo-body{display:flex;flex-direction:column;gap:6px;font-size:12.5px;color:var(--txt-dim);line-height:1.7}
+  .hypothesis .hypo-row{display:flex;align-items:baseline;gap:8px}
+  .hypothesis .hypo-lbl{
+    font-family:var(--mono);font-size:10.5px;font-weight:700;color:var(--accent);
+    background:var(--bg-soft);padding:1px 6px;border-radius:4px;flex:0 0 auto;
+  }
+
+  /* —— 负向结果与失效边界箱 —— */
+  .boundary-box{
+    display:block;min-width:0;
+    background:linear-gradient(180deg, #FBF8F5, #F5EFE8);
+    border:1px solid #E2D3C4;border-left:4px solid var(--warn);
+    border-radius:12px;padding:16px 20px;margin:14px 0;box-shadow:var(--shadow);
+  }
+  .boundary-box .boundary-head{
+    display:flex;align-items:center;gap:10px;margin-bottom:10px;padding-bottom:8px;
+    border-bottom:1px solid rgba(176,127,34,.2);
+  }
+  .boundary-box .boundary-head h3,.boundary-box .boundary-head h4{
+    margin:0;font-family:var(--serif);font-size:15px;color:var(--txt);line-height:1.3;
+  }
+  .boundary-box .boundary-item{font-size:12.5px;line-height:1.65;color:var(--txt-dim)}
+  .boundary-box .boundary-item b{color:var(--txt);font-family:var(--sans)}
+
+  /* —— 公式机理与变量解构块 —— */
+  .formula-wrap{
+    display:block;min-width:0;background:var(--panel);
+    border:1px solid var(--line);border-radius:12px;padding:16px 20px;
+    margin:14px 0;box-shadow:var(--shadow);
+  }
+  .formula-math{
+    font-family:var(--serif);font-size:16px;text-align:center;padding:10px 14px;
+    margin-bottom:12px;background:var(--bg-soft);border-radius:8px;
+    border:1px solid var(--line-soft);color:var(--txt);letter-spacing:.5px;overflow-x:auto;
+  }
+  .formula-vars{display:grid;grid-template-columns:1fr;gap:6px;border-top:1px solid var(--line-soft);padding-top:10px}
+  @media (min-width:640px){
+    .formula-vars.g2{grid-template-columns:1fr 1fr}
+    .formula-vars.g3{grid-template-columns:1fr 1fr 1fr}
+  }
+  .var-item{display:flex;align-items:baseline;gap:8px;font-size:12px;line-height:1.6}
+  .var-sym{font-family:var(--serif);font-weight:700;font-style:italic;color:var(--brand);min-width:40px;flex:0 0 auto}
+  .var-desc{color:var(--txt-dim)}
+
   /* —— 表格 —— */
   .tbl-wrap{overflow-x:auto;margin:14px 0;border-radius:10px;border:1px solid var(--line);background:var(--panel);box-shadow:var(--shadow);overscroll-behavior-inline:contain}
   .tbl-wrap:focus-visible{outline-offset:4px}
@@ -169,6 +250,14 @@
   td.ok{color:var(--good)} td.no{color:var(--bad)} td.warn{color:var(--warn)}
   td .mono{font-size:11.5px}
 
+  /* —— 消融实验与对照矩阵 —— */
+  .ablation-table td.baseline{background:rgba(47,80,97,.04);font-weight:600}
+  .ablation-table td.ours{background:rgba(139,58,31,.05);font-weight:700}
+  .delta-pos{color:var(--good);font-family:var(--mono);font-weight:700;font-size:11.5px}
+  .delta-neg{color:var(--bad);font-family:var(--mono);font-weight:700;font-size:11.5px}
+  .delta-neutral{color:var(--txt-faint);font-family:var(--mono);font-size:11.5px}
+  .signif{font-family:var(--mono);font-size:10px;color:var(--gold-text);margin-left:4px;font-weight:700}
+
   /* —— Pills / chips —— */
   .b-pill{font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;display:inline-block;font-family:var(--mono);letter-spacing:.3px;white-space:nowrap}
   .b-pill.ok{background:#DDE9D5;color:var(--good)}
@@ -176,6 +265,17 @@
   .b-pill.no{background:#EFD5CD;color:var(--bad)}
   .b-pill.inf{background:rgba(47,80,97,.13);color:var(--accent)}
   .b-pill.br{background:rgba(139,58,31,.13);color:var(--brand)}
+
+  /* —— 样本量与证据等级徽章 —— */
+  .sample-pill{
+    display:inline-flex;align-items:center;gap:4px;font-family:var(--mono);
+    font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;letter-spacing:.3px;
+    border:1px solid var(--line);background:var(--bg-soft);color:var(--txt-dim);vertical-align:middle;
+  }
+  .sample-pill.field{border-color:rgba(63,107,61,.3);background:#EAF2E7;color:var(--good)}
+  .sample-pill.sim{border-color:rgba(47,80,97,.3);background:#E8EEF2;color:var(--accent)}
+  .sample-pill.stat{border-color:rgba(106,75,16,.3);background:#FAF3E5;color:var(--gold-text)}
+  .sample-pill.warn{border-color:rgba(156,58,46,.3);background:#FCECE9;color:var(--bad)}
 
   .chip-row{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
   .chip{font-size:10.5px;padding:3px 9px;border-radius:5px;background:#EDE8DD;color:var(--txt-dim);font-family:var(--mono);border:1px solid var(--line)}
@@ -494,7 +594,7 @@
     body{background:#fff!important;color:#111;-webkit-print-color-adjust:exact;print-color-adjust:exact}
     .report-side,.skip-link,.btn-row,.actions,.tabs,.tabbar{display:none!important}
     .report-main{width:100%;max-width:none;margin:0;padding:0}
-    .hero,.card,.kpi,.tbl-wrap,.verdict,.note,.mermaid-wrap{box-shadow:none;break-inside:avoid}
+    .hero,.card,.kpi,.tbl-wrap,.verdict,.note,.mermaid-wrap,.hypothesis,.boundary-box,.formula-wrap{box-shadow:none;break-inside:avoid}
     .sec-head{break-after:avoid}.tbl-wrap{overflow:visible}.tbl-wrap table{min-width:0}
     .tab-pane,.tab-panel,.tab-pane[hidden],.tab-panel[hidden]{display:block!important;animation:none!important;padding:8px 0 12px}
     .tab-pane::before,.tab-panel::before{content:attr(data-print-title);display:block;margin:6px 0 4px;font:700 11px var(--mono);letter-spacing:.6px;color:var(--brand)}
@@ -504,7 +604,7 @@
 
 
 /* —— trace 轨迹组件（talk/report 集成） —— */
-#report-trace-root{display:none}
+#report-trace-root,#report-trace-data{display:none}
 #report-trace-root.trace-on{display:block;margin:0 0 18px}
 .trace-panel{border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);box-shadow:var(--shadow);overflow:hidden}
 .trace-head{display:flex;align-items:baseline;gap:10px;padding:12px 16px;border-bottom:1px solid var(--line-soft);font-size:13px;font-weight:700;color:var(--txt)}
@@ -557,12 +657,12 @@
     <footer class="report-footer">{{footer}}</footer>
   </main>
 </div>
-<div id="report-trace-data" style="display:none">{{trace}}</div>
+<div id="report-trace-data" hidden aria-hidden="true">{{trace}}</div>
 <script id="report-runtime">
 (function () {
   'use strict';
 
-  var VERSION = '3.1.0';
+  var VERSION = '3.2.0';
   var reducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   var simulatorTimers = new WeakMap();
 
@@ -1072,6 +1172,34 @@
     root.querySelectorAll('.kpi').forEach(function (node, index) {
       if (!node.querySelector('.num') || !node.querySelector('.lbl')) warnings.push('第 ' + (index + 1) + ' 个 KPI 缺少 .num 或 .lbl。');
     });
+    root.querySelectorAll('.hypothesis').forEach(function (node, index) {
+      var hasHeading = !!node.querySelector('h2,h3,h4,h5,h6');
+      var hasHypoRow = !!node.querySelector('.hypo-row');
+      if (!node.querySelector('.hypo-tag') || !hasHeading || !node.querySelector('.hypo-body') || !hasHypoRow) {
+        warnings.push('第 ' + (index + 1) + ' 个 .hypothesis 缺少 .hypo-tag、标题、.hypo-body 或 .hypo-row。');
+      }
+    });
+    root.querySelectorAll('.formula-wrap').forEach(function (node, index) {
+      var hasVarItem = !!node.querySelector('.var-item');
+      if (!node.querySelector('.formula-math') || !node.querySelector('.formula-vars') || !hasVarItem) {
+        warnings.push('第 ' + (index + 1) + ' 个 .formula-wrap 缺少 .formula-math 或包含 .var-item 的 .formula-vars。');
+      }
+    });
+    root.querySelectorAll('.boundary-box').forEach(function (node, index) {
+      var hasGrid = !!node.querySelector('.grid');
+      var hasItem = !!node.querySelector('.boundary-item');
+      if (!node.querySelector('.boundary-head') || !hasGrid || !hasItem) {
+        warnings.push('第 ' + (index + 1) + ' 个 .boundary-box 缺少 .boundary-head 或包含 .boundary-item 的 .grid。');
+      }
+    });
+    root.querySelectorAll('.card.discovery').forEach(function (node, index) {
+      var hasHeading = !!node.querySelector('h2,h3,h4,h5,h6');
+      var hasP = !!node.querySelector('p');
+      var hasVCol = !!node.querySelector('.v-col');
+      if (!node.querySelector('.disc-badge') || !hasHeading || !hasP || !node.querySelector('.vs-compact') || !hasVCol) {
+        warnings.push('第 ' + (index + 1) + ' 个 .card.discovery 缺少 .disc-badge、标题、p 或包含 .v-col 的 .vs-compact。');
+      }
+    });
     root.querySelectorAll('img').forEach(function (node) {
       if (!node.hasAttribute('alt')) warnings.push('图片缺少 alt：' + (node.getAttribute('src') || '(inline)'));
     });
@@ -1082,7 +1210,7 @@
       if (!node.hasAttribute('tabindex') || !node.getAttribute('aria-label')) warnings.push('横向表格容器缺少键盘焦点或可访问名称。');
     });
     var inlineStyleNodes = Array.prototype.slice.call(root.querySelectorAll('[style]')).filter(function (node) {
-      return !node.closest('.mermaid svg') && !node.classList.contains('mermaidTooltip');
+      return !node.closest('.mermaid svg') && !node.classList.contains('mermaidTooltip') && node.id !== 'report-trace-data' && !node.closest('#report-trace-data');
     });
     var nonTokenInlineStyles = inlineStyleNodes.filter(function (node) {
       return node.getAttribute('style').split(';').map(function (part) { return part.trim(); }).filter(Boolean)

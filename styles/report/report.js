@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '3.1.0';
+  var VERSION = '3.2.0';
   var reducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   var simulatorTimers = new WeakMap();
 
@@ -511,6 +511,34 @@
     root.querySelectorAll('.kpi').forEach(function (node, index) {
       if (!node.querySelector('.num') || !node.querySelector('.lbl')) warnings.push('第 ' + (index + 1) + ' 个 KPI 缺少 .num 或 .lbl。');
     });
+    root.querySelectorAll('.hypothesis').forEach(function (node, index) {
+      var hasHeading = !!node.querySelector('h2,h3,h4,h5,h6');
+      var hasHypoRow = !!node.querySelector('.hypo-row');
+      if (!node.querySelector('.hypo-tag') || !hasHeading || !node.querySelector('.hypo-body') || !hasHypoRow) {
+        warnings.push('第 ' + (index + 1) + ' 个 .hypothesis 缺少 .hypo-tag、标题、.hypo-body 或 .hypo-row。');
+      }
+    });
+    root.querySelectorAll('.formula-wrap').forEach(function (node, index) {
+      var hasVarItem = !!node.querySelector('.var-item');
+      if (!node.querySelector('.formula-math') || !node.querySelector('.formula-vars') || !hasVarItem) {
+        warnings.push('第 ' + (index + 1) + ' 个 .formula-wrap 缺少 .formula-math 或包含 .var-item 的 .formula-vars。');
+      }
+    });
+    root.querySelectorAll('.boundary-box').forEach(function (node, index) {
+      var hasGrid = !!node.querySelector('.grid');
+      var hasItem = !!node.querySelector('.boundary-item');
+      if (!node.querySelector('.boundary-head') || !hasGrid || !hasItem) {
+        warnings.push('第 ' + (index + 1) + ' 个 .boundary-box 缺少 .boundary-head 或包含 .boundary-item 的 .grid。');
+      }
+    });
+    root.querySelectorAll('.card.discovery').forEach(function (node, index) {
+      var hasHeading = !!node.querySelector('h2,h3,h4,h5,h6');
+      var hasP = !!node.querySelector('p');
+      var hasVCol = !!node.querySelector('.v-col');
+      if (!node.querySelector('.disc-badge') || !hasHeading || !hasP || !node.querySelector('.vs-compact') || !hasVCol) {
+        warnings.push('第 ' + (index + 1) + ' 个 .card.discovery 缺少 .disc-badge、标题、p 或包含 .v-col 的 .vs-compact。');
+      }
+    });
     root.querySelectorAll('img').forEach(function (node) {
       if (!node.hasAttribute('alt')) warnings.push('图片缺少 alt：' + (node.getAttribute('src') || '(inline)'));
     });
@@ -521,7 +549,7 @@
       if (!node.hasAttribute('tabindex') || !node.getAttribute('aria-label')) warnings.push('横向表格容器缺少键盘焦点或可访问名称。');
     });
     var inlineStyleNodes = Array.prototype.slice.call(root.querySelectorAll('[style]')).filter(function (node) {
-      return !node.closest('.mermaid svg') && !node.classList.contains('mermaidTooltip');
+      return !node.closest('.mermaid svg') && !node.classList.contains('mermaidTooltip') && node.id !== 'report-trace-data' && !node.closest('#report-trace-data');
     });
     var nonTokenInlineStyles = inlineStyleNodes.filter(function (node) {
       return node.getAttribute('style').split(';').map(function (part) { return part.trim(); }).filter(Boolean)

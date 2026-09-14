@@ -1,6 +1,6 @@
 import { parse, parseFragment, serialize } from "../../../npm/node_modules/parse5/dist/index.js";
 
-export const REPORT_DESIGN_SYSTEM_VERSION = "3.1.0";
+export const REPORT_DESIGN_SYSTEM_VERSION = "3.2.0";
 
 export type ReportAuditSeverity = "error" | "warning";
 
@@ -48,6 +48,10 @@ interface FragmentFacts {
 	nonHeroSections: HtmlNode[];
 	kpis: HtmlNode[];
 	tables: HtmlNode[];
+	hypotheses: HtmlNode[];
+	formulas: HtmlNode[];
+	boundaries: HtmlNode[];
+	discoveries: HtmlNode[];
 	inlineStyleCount: number;
 	topLevel: HtmlNode[];
 	heroes: HtmlNode[];
@@ -373,7 +377,8 @@ function auditReportContentUnsafe(
 
 	const facts: FragmentFacts = {
 		classCounts: new Map(), ids: new Map(), headings: [], localLinks: [], sections: [],
-		nonHeroSections: [], kpis: [], tables: [], inlineStyleCount: 0, topLevel: [], heroes: [], verdicts: [],
+		nonHeroSections: [], kpis: [], tables: [], hypotheses: [], formulas: [], boundaries: [], discoveries: [],
+		inlineStyleCount: 0, topLevel: [], heroes: [], verdicts: [],
 	};
 	facts.topLevel = (fragment.childNodes ?? []).filter((node: HtmlNode) => isElement(node) || (node.nodeName === "#text" && String(node.value ?? "").trim()));
 
@@ -460,6 +465,10 @@ function auditReportContentUnsafe(
 		if (classes.has("kpi")) facts.kpis.push(node);
 		if (classes.has("hero")) facts.heroes.push(node);
 		if (classes.has("verdict")) facts.verdicts.push(node);
+		if (classes.has("hypothesis")) facts.hypotheses.push(node);
+		if (classes.has("formula-wrap")) facts.formulas.push(node);
+		if (classes.has("boundary-box")) facts.boundaries.push(node);
+		if (classes.has("card") && classes.has("discovery")) facts.discoveries.push(node);
 
 		const isRequiredStructure = classes.has("hero") || classes.has("verdict") || (name === "section" && id !== undefined);
 		if (isRequiredStructure) {
@@ -485,6 +494,34 @@ function auditReportContentUnsafe(
 	for (const target of facts.localLinks) if (target && !facts.ids.has(target)) add("warning", "broken-anchor", `Local link #${target} has no matching report ID.`);
 	for (const kpi of facts.kpis) {
 		if (!hasDescendantClass(kpi, "num") || !hasDescendantClass(kpi, "lbl")) add("error", "kpi-anatomy", "Each .kpi must contain a .num and a .lbl descendant.");
+	}
+	for (const hypo of facts.hypotheses) {
+		const hasHeading = descendants(hypo).some((child) => isElement(child) && /^h[2-6]$/.test(child.tagName));
+		const hasHypoRow = hasDescendantClass(hypo, "hypo-row");
+		if (!hasDescendantClass(hypo, "hypo-tag") || !hasHeading || !hasDescendantClass(hypo, "hypo-body") || !hasHypoRow) {
+			add("error", "hypothesis-anatomy", "Each .hypothesis must contain .hypo-tag, a heading (h3/h4), and .hypo-body with at least one .hypo-row entry.");
+		}
+	}
+	for (const form of facts.formulas) {
+		const hasVarItem = hasDescendantClass(form, "var-item");
+		if (!hasDescendantClass(form, "formula-math") || !hasDescendantClass(form, "formula-vars") || !hasVarItem) {
+			add("error", "formula-anatomy", "Each .formula-wrap must contain .formula-math and .formula-vars with at least one .var-item entry.");
+		}
+	}
+	for (const box of facts.boundaries) {
+		const hasGrid = hasDescendantClass(box, "grid");
+		const hasItem = hasDescendantClass(box, "boundary-item");
+		if (!hasDescendantClass(box, "boundary-head") || !hasGrid || !hasItem) {
+			add("error", "boundary-anatomy", "Each .boundary-box must contain .boundary-head and a .grid container with .boundary-item entries.");
+		}
+	}
+	for (const disc of facts.discoveries) {
+		const hasHeading = descendants(disc).some((child) => isElement(child) && /^h[2-6]$/.test(child.tagName));
+		const hasP = descendants(disc).some((child) => isElement(child) && child.tagName === "p");
+		const hasVCol = hasDescendantClass(disc, "v-col");
+		if (!hasDescendantClass(disc, "disc-badge") || !hasHeading || !hasP || !hasDescendantClass(disc, "vs-compact") || !hasVCol) {
+			add("error", "discovery-anatomy", "Each .card.discovery must contain .disc-badge, a heading (h3/h4), a <p> description, and .vs-compact with .v-col comparison columns.");
+		}
 	}
 	validateTabSets(fragment, add);
 

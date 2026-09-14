@@ -1,7 +1,7 @@
 {
   "id": "report",
   "name": "期刊式正式汇报 · Report Design System",
-  "description": "/talk 唯一正式汇报基础样式。源自智渔粮库整合报告：纸张色、侧栏目录、衬线标题、KPI/证据表/时间线/结论框；含内容审计、键盘交互、响应式、打印与降级策略。",
+  "description": "/talk 唯一正式汇报基础样式。源自智渔粮库整合报告：纸张色、侧栏目录、衬线标题、KPI/证据表/时间线/结论框；含科研范式组件（假设机理、消融矩阵、失效边界、样本徽章、公式解构、实证洞见）、内容审计、键盘交互、响应式、打印与降级策略。",
   "kind": "html-js",
   "entry": "index.html",
   "default": true,
@@ -10,6 +10,7 @@
     "js",
     "formal-report",
     "design-system",
+    "scientific",
     "mermaid",
     "kpi",
     "tabs",
@@ -21,6 +22,6 @@
     "base",
     "default"
   ],
-  "version": "3.1.0",
+  "version": "3.2.0",
   "governance": "report"
 }

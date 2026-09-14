@@ -1,6 +1,6 @@
 # Talk Report Design System
 
-**Version:** 3.1.0  
+**Version:** 3.2.0
 **Status:** release candidate  
 **Canonical implementation:** `report.css` + `report.js` + `shell.html` → `index.html`
 
@@ -19,17 +19,19 @@ It preserves the reference report's recognizable visual grammar:
 - fixed contents rail, dense evidence tables, KPI cards, timelines and a decisive closing verdict;
 - restrained motion and compact, journal-like information density.
 
-The goal is not to clone one page. It is to make that page's grammar repeatable across project reports, reviews, milestones, weekly updates and acceptance summaries.
+The goal is not to clone one page. It is to make that page's grammar repeatable across scientific research reports, lab evaluations, project proposals, milestones, weekly updates and acceptance summaries.
 
 ## 2. Non-negotiable principles
 
 1. **Conclusion first.** The first viewport must answer: what happened, why it matters, and what decision/action follows.
-2. **Evidence after assertion.** Use KPI, table, timeline or source blocks for claims that matter.
-3. **One semantic component per job.** A card is context; a note is a caveat; a verdict is the final decision.
-4. **Color reinforces meaning but never carries it alone.** Always pair color with text or status labels.
-5. **Formal reports use `styleId: report`.** `html-interactive` is an explicit prototype mode, not an alternate reporting shell.
-6. **No one-off visual forks.** New patterns enter `report.css`, this specification, the fixture and tests together.
-7. **Readable failure.** Optional Mermaid failure must preserve source; reduced motion, narrow screens and print must retain all information.
+2. **Visual mind-model first for comprehensive reports.** Comprehensive formal reports (such as acceptance, proposal, review, progress, or scientific research) must anchor human comprehension with an executive visualization (Mermaid flowchart, architecture subgraph, or process chain) directly after the executive overview. Single-concept pedagogical drill-downs (talk_explain / explain.ir/v1) focus on layered pedagogical disclosure and are exempt from the global closed-loop diagram requirement.
+3. **No naked jargon accumulation.** Technical identifiers, class names, and algorithms must never be dumped as comma-separated lists. Every mechanism must state its concrete action and real-world value ("动词 + 用户/业务价值"). Numbers must tie to real physical or business entities, not empty test counts.
+4. **Scientific research rigor.** Research reporting must adhere to empirical rigor: clear scientific hypothesis, controlled baseline comparisons, ablation contribution, honest negative failure boundaries, and sample size disclosure.
+5. **One semantic component per job.** A card is context; a note is a caveat; a hypothesis is a testable claim; a boundary box is an honest limitation; a verdict is the final decision.
+6. **Color reinforces meaning but never carries it alone.** Always pair color with text or status labels.
+7. **Formal reports use `styleId: report`.** `html-interactive` is an explicit prototype mode, not an alternate reporting shell.
+8. **No one-off visual forks.** New patterns enter `report.css`, this specification, the fixture and tests together.
+9. **Readable failure.** Optional Mermaid failure must preserve source; reduced motion, narrow screens and print must retain all information. No hiding concepts in unstyled all-text `<details>` folds.
 
 ## 3. Architecture and source of truth
 
@@ -100,32 +102,46 @@ Executive summary → KPI/status → evidence → comparison or risks → timeli
 |---|---|---|
 | Hero | `.hero > h1 + .sub` | report title and executive thesis |
 | Section | `section[id].sec-head[data-nav-title]` | navigable chapters |
-| KPI | `.kpi > .num + .lbl` (`.sub` optional) | a small set of decision-relevant metrics |
+| KPI | `.kpi > .num + .lbl` (`.sub` optional) | a small set of decision-relevant metrics tied to real entities |
 | Card | `.card > h3 + content` | context or grouped reasoning |
-| Evidence table | `.tbl-wrap > table` with caption and scoped headers | traceable comparisons and acceptance data |
-| Note | `.note.(info|warn|crit|good)` | caveat or bounded callout |
-| Compare | `.vs > .vs-col.old + .vs-mid + .vs-col.new` | before/after or option contrast |
-| Timeline | `.tl > .tl-item` | milestones and evolution |
-| Tabs | `.tabs > .tb[data-tab]` + sibling `.tab-pane[data-pane]` | alternate views of the same evidence |
+| Hypothesis | `.hypothesis > .hypo-tag + (h3\|h4) + .hypo-body > .hypo-row` | scientific hypotheses with premise, prediction, and mechanism |
+| Formula wrap | `.formula-wrap > .formula-math + .formula-vars > .var-item` | mathematical objectives with variable semantics table |
+| Evidence table | `.tbl-wrap > table` with caption and scoped headers | problem-to-mechanism mappings and traceable comparisons |
+| Ablation matrix | `.tbl-wrap > table.ablation-table` | controlled group comparisons and component ablation deltas |
+| Boundary box | `.boundary-box > .boundary-head + .grid > .boundary-item` | honest negative results, failure conditions, and limitations |
+| Discovery card | `.card.discovery > .disc-badge + (h3\|h4) + p + .vs-compact > .v-col` | empirical insights and counter-intuitive observations |
+| Sample badge | `.sample-pill.(field\|sim\|stat\|warn)` | sample scale (N=...), environment, and statistical significance |
+| Note | `.note.(info\|warn\|crit\|good)` | caveat or bounded callout |
+| Compare | `.vs > .vs-col.old + .vs-mid + .vs-col.new` | before/after dilemma vs upgrade contrast |
+| Timeline | `.tl > .tl-item` | milestones and evolution of architectural decisions |
+| Horizontal chain | `.h-tl > .ev + .arrow` | concise operational pipelines or closed loops |
+| Tabs | `.tabs > .tb[data-tab]` + sibling `.tab-pane[data-pane]` | alternate views of evidence to prevent information overload |
 | Progress | `.anim-bar` with custom property `--w` | bounded progress only |
-| Details | `details.hook` or `details.conv` | optional depth |
+| Details | `details.conv` (report text) / `details.hook` (`talk_explain` only) | optional depth; hand-authored report text must not hide primary concept explanations in unformatted details folds |
 | Verdict | `.verdict > .lbl + h3 + p` | final decision, boundary and next action |
 | Actions | `.actions > button[data-talk-event]` | lightweight feedback to the agent |
 
-Modifiers: `.hl`, `.brand`, `.gold`, `.good`, `.crit`; grid: `.grid.g2` through `.g6`; status: `.b-pill.ok|mid|no|inf|br`.
+Modifiers: `.hl`, `.brand`, `.gold`, `.good`, `.crit`, `.discovery`; grid: `.grid.g2` through `.g6`; status: `.b-pill.ok|mid|no|inf|br`.
 
 ## 7. Content patterns by report type
 
 | Intent | Recommended composition |
 |---|---|
-| Completion / acceptance | Hero → acceptance KPIs → test evidence table → residual risks → verdict |
-| Weekly / phase update | Hero → progress KPIs → done/blocked cards → timeline → next-week verdict |
-| Proposal / review | Hero → problem evidence → option comparison → architecture/plan → decision request |
-| Research summary | Hero → question/method → evidence table → findings cards → limitations note → conclusion |
-| Incident / audit | Hero → severity KPIs → timeline → root-cause table → remediation → acceptance verdict |
-| Explanation (`talk_explain`) | Hero (topic + audience pills) → one-sentence core → deeper layers as `details.hook` sections → analogy with its breakage note → limitations note → understanding checks (`.actions` buttons) → verdict as the one sentence to remember |
+| Scientific research / lab report | Hero → Problem & Hypothesis (`.hypothesis`, `.formula-wrap`) → Visual closed loop (Mermaid) → Controlled evaluation & Ablation matrix (`.ablation-table`, `.sample-pill`) → Negative boundaries (`.boundary-box`) → Key discoveries (`.card.discovery`) → Research roadmap verdict |
+| Stage acceptance / delivery | Hero → Problem context & delivered experience → Visual interaction loop (Mermaid) → Problem-to-mechanism mapping table (`.tbl-wrap`, `.tabs`) → Negative boundaries & residual gaps (`.vs`, `.boundary-box`) → Acceptance verdict *(raw CI test counts relegated to appendix)* |
+| Proposal / architecture review | Hero → Real-world dilemmas vs upgrade goals (`.vs`) → Global closed-loop flowchart (Mermaid) → Subsystem deep-dives (`.tabs` + `.tbl-wrap`) → Architecture evolution timeline (`.tl`) → Phased implementation roadmap (`.h-tl`) → Decision request verdict |
+| Progress & milestone update | Hero → Delivered behavioral capabilities (NOT file counts) → Milestone flowchart/burn-down → Technical trade-offs & blockers (`.card.gold`, `.note.warn`) → Next-phase plan verdict |
+| Concept explanation (in report text) | Hero/section → Plain intuition summary → Accompanying visual diagram (.mermaid-wrap / ASCII) → What it IS vs what it is NOT (.vs / .vs-compact) → Concrete real-world example (.code-block) → Takeaway (structured cards; NO unformatted details text-folds) |
+| Explanation layer (talk_explain) | Hero (topic + audience pills) → one-sentence core → deeper layers as details.hook sections (compiler-managed) → analogy with its breakage note → limitations note → understanding checks (.actions buttons) → verdict as the takeaway sentence |
 
-## 8. Accessibility contract
+## 8. Anti-patterns to reject
+
+1. **Empty test scorecards**: Filling reports with "73/73 pass", "0 errors", and a table of unit test names. A test report must explain the test suite's design strategy, what hypothesis it guards, and what empirical boundaries were discovered.
+2. **Promotional phase progress**: Celebrating "100% pass", "24 files edited", and buzzwords without explaining what system behavior changed or what trade-offs were made.
+3. **All-text `<details>` folds in report bodies**: Hiding a wall of unformatted text inside an ad-hoc `<details>` fold to explain a core concept in report bodies. Use structured cards (`.card`) with mini-diagrams, before/after contrast, and concrete code examples instead. (Compiler-managed `talk_explain` retains progressive `details.hook` for its pedagogical drill-down levels).
+4. **Naked jargon lists**: Writing sentences that merely string together technical identifiers without action or user value.
+
+## 9. Accessibility contract
 
 - One `h1`; headings do not skip levels without reason.
 - Every `section` used in navigation has a stable unique `id`.
@@ -136,7 +152,7 @@ Modifiers: `.hl`, `.brand`, `.gold`, `.good`, `.crit`; grid: `.grid.g2` through 
 - Focus must remain visible; do not suppress outlines.
 - Reduced-motion preference disables animations; print hides navigation/actions while expanding every tab pane and closed `details` block so evidence is not lost.
 
-## 9. Trust and safety boundary
+## 10. Trust and safety boundary
 
 `report` accepts a conservative document fragment, not arbitrary application HTML. Before publication, the standard HTML5 `parse5` tokenizer/tree builder, canonical parse→serialize→reparse pass and allowlists enforce all of the following:
 
@@ -152,7 +168,7 @@ The renderer places accepted content inside `#report-content-root`. The Talk bri
 
 Mermaid is optional, pinned to 11.16.1, protected by SRI + hash-based CSP and initialized in strict mode. It begins only after `window.load`, cannot delay core `data-report-ready`, and has a bounded 12-second load window; source is visible throughout and remains with a status message on failure.
 
-## 10. Runtime self-audit
+## 11. Runtime self-audit
 
 The page exposes:
 

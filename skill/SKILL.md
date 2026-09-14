@@ -41,7 +41,7 @@ report classes, **not** inline-styled `html-interactive` soup.
 | 架构图 / 时序 / 数据流 / 系统地图 | **`arch`** | Archify JSON |
 | 画布共创 | **`draw`** | tldraw |
 | 多版本文案/方案并排对比、redline 审阅 | `compare` | content = JSON {versions:[…]} |
-| 分层解释（ELI5/机制/代码/类比 + 理解检查） | **`talk_explain` 工具** | 不选样式，直接给 ExplanationPlan IR；渲染进 report |
+| 分层解释（ELI5/机制/代码/类比 + 理解检查） | **`talk_explain` 工具** | 专属 explain 概念精解样式：单栏沉浸、100% 平铺零折叠 |
 | 用例 × 模型评测打分、baseline 对照 | `evalgrid` | content = JSON 蓝图 |
 | 长文精读批注(抽主张/找反证) | `paper` | content = 原文 HTML |
 | 截图/设计稿热区标注反馈 | `inspect` | content = 图片 URL/dataURL |
@@ -58,7 +58,14 @@ report classes, **not** inline-styled `html-interactive` soup.
 2. `report` 是唯一正式汇报壳（治理能力由 manifest 的 `"governance": "report"` 声明，其它包将来可复用）；`html-interactive` 只适合轻交互原型，不能作为另一套汇报格式。
 3. `talk_render` 返回 report audit 后，修复全部 error 和 warning（交付目标为 0/0）；不要通过切换到 raw HTML 样式绕过设计系统。
 4. 若当前 session 已是错误样式，立刻 `talk_set_style` 切换后 `talk_render` 重渲，不要在错误壳上继续堆内容。
-5. 分层解释走 `talk_explain`，不要手写 `html-interactive` 解释页：用户说「解释一下 / 我没懂 / 用大白话 / 给新人讲」且需要分层或可视化时，构造 `explain.ir/v1` 的 ExplanationPlan（一句话核心 → 机制/例子/代码/类比层 → 1–3 条 limitations → 可选 0–2 个理解检查），一次调用完成校验+渲染。类比层必须给 `analogyBreakage`（类比在哪里失效）；`answerId` 只留在 IR 里，页面不显示正确答案；答错后重渲整页（不要 patch 治理面）。
+5. 概念解释走 `talk_explain` 直达独立 `explain` 设计系统：用户说「解释一下 / 我没懂 / 用大白话 / 给新人讲」且需要深入概念或因果机制时，构造 `explain.ir/v1` 的 ExplanationPlan（一句话核心 → 机制/例子/代码/类比层 → 1–3 条 limitations → 可选 0–2 个理解检查），一次调用完成校验与渲染。页面 100% 直接平铺可见，绝无 `<details>` 强制折叠；类比层必须给 `analogyBreakage`（类比在哪里失效）；`answerId` 只留在 IR 里，页面不显示正确答案；答错后重渲整页。
+6. **综合汇报的可视化心智模型要求**：在撰写综合性正式汇报（如阶段验收、方案立项、周报复盘、科研实验汇报）时，在 Hero 或总览之后必须包含一张 Mermaid 可视化闭环/架构流转图，并配以伴随解释卡片（图文互证），帮助读者建立全局心智模型；单点概念解释（`talk_explain`）定位为渐进分层教学交互面，豁免综合报告的整体闭环流程图要求。
+7. **去术语化与严禁空心跑分**：严禁出现无主语的代码/算法名词连缀串（如“实现了 A, B, C”），必须陈述具体动作与价值（“动词 + 业务/用户价值”）；数字必须挂钩真实实体（痛点数、试验点数、实测增益），严禁将纯 CI 单元测试通过率作为正文主干。
+8. **科研范式与概念解构边界**：
+   - 科研与实验汇报必须遵循五联体：核心假设（`.hypothesis`）、闭环系统（Mermaid）、消融对照（`.ablation-table`）、失效边界（`.boundary-box`）、实证洞见（`.card.discovery`）。
+   - **概念解释的场景区分**：
+     - ① **正式汇报（Report）正文内的概念说明**：严禁在正文中扔一个无排版全文字 `<details>` 偷懒敷衍，必须采用“一句话定义 + 微图解/代码 + 正反辨析”的结构化解构卡片（参考 COOKBOOK 模板二）。
+     - ② **对话中单点概念的渐进式教学**：当用户在会话中直接要求「解释一下 XX / 我没懂 / 给新人讲讲」时，严格使用 `talk_explain` 工具走 `explain.ir/v1` 渐进式教学层级（首层展开核心，后续深层按教学目标折叠并带理解检查）。
 
 ## Commands (user)
 
