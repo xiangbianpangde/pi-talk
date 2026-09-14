@@ -155,7 +155,10 @@ function stableToken(value: string): boolean {
 	return /^[A-Za-z][A-Za-z0-9_.:-]*$/.test(value);
 }
 
-export function auditExplainContent(content: string): ExplainAuditResult {
+export function auditExplainContent(
+	content: string,
+	options?: { requireStructure?: boolean },
+): ExplainAuditResult {
 	const issues: ExplainAuditIssue[] = [];
 	const add = (severity: ExplainAuditSeverity, code: string, message: string): void => {
 		if (!issues.some((i) => i.severity === severity && i.code === code && i.message === message)) {
@@ -334,9 +337,12 @@ export function auditExplainContent(content: string): ExplainAuditResult {
 	}
 
 	// 校验 h1
-	const h1s = headings.filter((h) => h.level === 1);
-	if (h1s.length !== 1) {
-		add("error", "h1-count", `Explain fragments must contain exactly one h1 (found ${h1s.length}).`);
+	const requireStructure = options?.requireStructure ?? true;
+	if (requireStructure) {
+		const h1s = headings.filter((h) => h.level === 1);
+		if (h1s.length !== 1) {
+			add("error", "h1-count", `Explain fragments must contain exactly one h1 (found ${h1s.length}).`);
+		}
 	}
 
 	// 校验平滑标题顺序

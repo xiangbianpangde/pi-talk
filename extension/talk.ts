@@ -514,7 +514,7 @@ export default function (pi: ExtensionAPI) {
 		promptGuidelines: [
 			"Use talk_explain when the explanation needs layers or visuals (解释一下/我没懂/用大白话讲/给新人介绍); a two-sentence answer stays in plain text.",
 			"talk_explain fails closed: fix every reported error before retrying, and never rebuild the same page by hand in html-interactive.",
-			"Understanding-check clicks arrive as explain-check events with value checkId::choiceId; read them with talk_poll_events, judge against plan.checks[].answerId, then re-render the full plan — patching a governed report bypasses its audit.",
+			"Understanding-check clicks arrive as explain-check events with value checkId::choiceId; read them with talk_poll_events, judge against plan.checks[].answerId, then re-render the full plan — re-rendering maintains consistent pedagogical state and document versioning.",
 		],
 		parameters: Type.Object({
 			planJson: Type.String({

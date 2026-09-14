@@ -727,7 +727,7 @@ export async function renderTalk(
 		let patchHtml = patch.html;
 		if (patch.method !== "remove" && typeof patchHtml === "string") {
 			if (isExplain) {
-				const audit = auditExplainContent(patchHtml);
+				const audit = auditExplainContent(patchHtml, { requireStructure: false });
 				if (!audit.valid) {
 					return {
 						ok: false,
@@ -1438,7 +1438,7 @@ ${runtime.file ? `Latest file: ${runtime.file}` : ""}
 - \`/talk surfaces\` — list surfaces; \`/talk open [surface]\` — open a surface
 
 ### Incremental updates
-- **Patch**: \`talk_render({ content: \"\", patch: { selector: \"#id\", html: \"<p>…</p>\", method: \"inner|outer|append|prepend|remove\" } })\` updates only a subtree — no reload, scroll/focus preserved. Patches are not versioned.
+- **Patch**: \`talk_render({ content: \"\", patch: { selector: \"#id\", html: \"<p>…</p>\", method: \"inner|outer|append|prepend|remove\" } })\` updates only a subtree — no reload, scroll/focus preserved. Patches on persistent selectors write a durable version snapshot.
 - **Forms**: any form with \`data-talk-form\` is serialized (values) and sent via talkSend on submit; elements with \`data-talk-input\` send debounced input events.
 - **Surfaces**: render to a named surface with \`surface: \"id\"\`; each surface keeps its own document + version history; \`/s/<id>\` serves it at a stable URL.
 
