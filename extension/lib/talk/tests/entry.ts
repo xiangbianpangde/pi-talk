@@ -174,6 +174,25 @@ test("information: shadow scenarios preserve decisions, reject fabricated claims
 	eq(engine.refine("completed", []).state, "unknown");
 });
 
+test("information: new evidence and risk identity cannot be deduplicated as unchanged", () => {
+	const engine = createInformationEngine(); engine.begin("Check deployment");
+	engine.collect("first", "check 1", "deployment pending", false);
+	engine.collect("second", "check 2", "deployment pending", false);
+	const result = { text: "deployment pending", kind: "result" as const, status: "observed" as const, evidenceIds: ["first"] };
+	eq(engine.refine("partial", [result], false).delivery, "send");
+	eq(engine.refine("partial", [result], false).delivery, "suppress");
+	eq(engine.refine("partial", [{ ...result, evidenceIds: ["second"] }], false).delivery, "send");
+	const risk = { ...result, kind: "risk" as const, evidenceIds: ["second"] };
+	const changed = engine.refine("partial", [{ ...result, evidenceIds: ["second"] }, risk], false);
+	eq(changed.delivery, "send");
+	eq(changed.claims.length, 2, "risk is not a duplicate of result text");
+	eq(engine.refine("partial", changed.claims, true).delivery, "send", "explicit request is never silently suppressed");
+	const untrusted = createInformationEngine(); untrusted.begin("Check deployment");
+	untrusted.collect("log", "mixed log", "Deployment did not pass; earlier tests passed", false);
+	const unsupported = untrusted.refine("partial", [{ text: "Deployment passed", kind: "result", status: "observed", evidenceIds: ["log"] }]);
+	eq(unsupported.claims[0].status, "unverified", "keyword subsets cannot erase negation");
+});
+
 test("information: immutable requirements and critical versus incidental truncation", () => {
 	const e = createInformationEngine(); e.begin("Implement A and B");
 	const requirements = [{ id: "a", userAnchor: "A", criterion: "A tested" }, { id: "b", userAnchor: "B", criterion: "B tested" }];
