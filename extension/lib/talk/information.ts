@@ -45,10 +45,13 @@ export function createInformationEngine() {
 					claims.push({ text: `Tool failure: ${e.locator}`, kind: "risk", status: "unverified", evidenceIds: [e.id] });
 				}
 			}
-			const acceptance = acceptanceEvidenceIds.length > 0 && acceptanceEvidenceIds.every((id) => known.has(id) && !known.get(id)!.failed);
+			const acceptance = acceptanceEvidenceIds.length > 0 && acceptanceEvidenceIds.every((id) =>
+				known.has(id) && !known.get(id)!.failed && claims.some((c) =>
+					c.kind === "result" && c.status === "observed" && c.evidenceIds.includes(id)));
+			if (state === "completed" && !claims.length) warnings.push("An empty brief cannot establish completion.");
 			// Even a supported claim is not a complete acceptance protocol. The producer
 			// must associate the supplied checks with the user's actual requirements.
-			if (state === "completed" && (!acceptance || incomplete || claims.some((c) => c.kind === "blocker" || c.status === "unverified") || evidence.some((e) => e.failed))) {
+			if (state === "completed" && (!acceptance || !claims.length || incomplete || claims.some((c) => c.kind === "blocker" || c.status === "unverified") || evidence.some((e) => e.failed))) {
 				state = "partial"; warnings.push("Completion not established by this evidence scope.");
 			}
 			if (!goal) { state = "unknown"; warnings.push("No anchored task goal."); }
