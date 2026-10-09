@@ -26,7 +26,9 @@ try {
  const tools = runner.getAllRegisteredTools();
  assert.ok(tools.some((t) => t.definition.name === "talk_report_context"));
  await runner.emit({ type: "agent_start" });
- await runner.emitBeforeAgentStart("Verify A", undefined, { customPrompt: "test", cwd: process.cwd() });
+ const promptPolicy = await runner.emitBeforeAgentStart("Verify A", undefined, { customPrompt: "test", cwd: process.cwd() });
+ assert.ok(JSON.stringify(promptPolicy).includes("Continue authorized execution after updates"));
+ assert.ok(JSON.stringify(promptPolicy).includes("do not ask again for already granted permission"));
  await runner.emitToolResult({ type: "tool_result", toolName: "bash", toolCallId: "real-runner", input: { command: "test" }, content: [{ type: "text", text: "passed" }], isError: false });
  const evidenceTool = runner.getToolDefinition("talk_report_context");
  assert.ok(evidenceTool);

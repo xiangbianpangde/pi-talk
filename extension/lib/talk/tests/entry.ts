@@ -248,6 +248,9 @@ test("information: shadow matrix covers completed, partial, failed, blocked, unc
 	unchanged.refine("partial", candidate, false);
 	eq(unchanged.refine("partial", candidate, false).delivery, "suppress");
 	ok((unchanged.refine("blocked", [{ text: "new blocker", kind: "blocker", status: "inferred", evidenceIds: [] }], false).claims[0].value ?? 0) > 0);
+	const empty = unchanged.refine("unknown", [], false);
+	eq(empty.delivery, "suppress", "empty automatic stage update is suppressed");
+	eq(empty.reason, "insufficient-evidence");
 	const decision = unchanged.refine("blocked", [{ text: "Choose target", kind: "decision", status: "inferred", evidenceIds: [] }], true);
 	eq(decision.claims[0].kind, "decision");
 });

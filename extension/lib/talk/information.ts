@@ -7,7 +7,7 @@ export interface RequirementCheck { requirementId: string; evidenceIds: string[]
 export interface FailureResolution { failureId: string; verificationId: string }
 export interface AcceptanceMap { checks?: RequirementCheck[]; resolutions?: FailureResolution[] }
 export interface Claim { text: string; kind: "result" | "risk" | "blocker" | "decision"; status: "observed" | "inferred" | "unverified"; evidenceIds: string[]; value?: number }
-export interface Brief { state: TaskState; claims: Claim[]; delivery: "send" | "suppress"; warnings: string[] }
+export interface Brief { state: TaskState; claims: Claim[]; delivery: "send" | "suppress"; warnings: string[]; reason?: "explicit" | "material-change" | "unchanged" | "insufficient-evidence" }
 const STOPWORDS = new Set(["a", "an", "the", "all", "已", "已完成", "完成", "全部", "所有", "的", "了", "并", "且"]);
 const tokens = (value: string) => value.toLowerCase().match(/[a-z0-9]+|[\u4e00-\u9fff]+/g) || [];
 const meaningful = (value: string) => tokens(value).filter((t) => !STOPWORDS.has(t));
@@ -107,9 +107,11 @@ export function createInformationEngine() {
 			if (incomplete) warnings.push("Some context was truncated or evicted; completion depends on intact mapped acceptance evidence, not complete historical logs.");
 			if (goalIncomplete || droppedFailure) warnings.push("Critical goal or failure context is missing; completion cannot be established.");
 			const current = fingerprint(JSON.stringify({ state, claims }));
-			const delivery = !explicit && current === previous ? "suppress" : "send";
+			const unchanged = current === previous;
+			const delivery = !explicit && (unchanged || state === "unknown" || !claims.length) ? "suppress" : "send";
 			previous = current;
-			return { state, claims, delivery, warnings };
+			const reason = explicit ? "explicit" : unchanged ? "unchanged" : state === "unknown" || !claims.length ? "insufficient-evidence" : "material-change";
+			return { state, claims, delivery, warnings, reason };
 		},
 	};
 }

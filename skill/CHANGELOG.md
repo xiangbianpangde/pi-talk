@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.4.0
+
+- Stage updates are non-blocking and require consequential change; milestones and commits do not end execution.
+- Ask only for essential input, scope changes or actual required authorization; reuse existing permission.
+- Empty automatic drafts are suppressed; explicit requests remain responsive.
+
 ## 1.3.0
 
 - Apply the user's 5/5 preference for conclusion/status-first, decision-oriented reporting without forcing a template.

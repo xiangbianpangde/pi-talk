@@ -19,6 +19,10 @@ Patch governance now resolves the existing target surface before auditing or che
 
 Run isolated regression tests with `node extension/lib/talk/tests/run-tests.mjs`. For release verification use `TALK_REQUIRE_CHROME=1 node extension/lib/talk/tests/run-tests.mjs`; missing Chromium is a failure in release mode, otherwise browser-dependent cases explicitly report SKIP. The runner still depends on locally installed esbuild, parse5 and typebox; it is not yet a portable CI environment. Chromium can fail intermittently on macOS without a usable display context; a failed run is not automatically retried or reported as passing.
 
+### Non-blocking stage reporting and authorization
+
+Stage updates must not terminate authorized work. The injected policy and skill require consequential change before an update and prohibit stopping just to announce commits, test counts or plans. Repeated and empty automatic briefs are suppressed; explicit questions remain responsive. Ask for essential missing input, real scope changes or an operation requiring permission, not permission to continue already-authorized work. This policy is verified in actual Pi prompt injection, but live-model compliance is not yet independently measured. The extension does not override host/user aborts or guarantee that every assistant follows the policy. Ordinary text requires no format authorization; the existing explicit rich-media gate remains separate.
+
 ### User preference calibration
 
 The user chose the conclusion/status-first alternative in **5/5** presented historical-task comparisons. This supports concise, decision-oriented main-transcript reporting with explicit unfinished work and limits, without imposing a fixed template. Both alternatives were assistant-authored; this was neither blinded independent fact review nor an engine-generated A/B benchmark. It establishes a presentation preference, not demonstrated factual accuracy, Token savings or latency improvement.

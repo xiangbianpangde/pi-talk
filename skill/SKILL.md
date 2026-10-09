@@ -2,7 +2,7 @@
 name: talk
 description: Task-focused reporting in the main conversation, with evidence checks and optional explicitly requested HTML, diagrams, images or canvas. Use for /talk and task summaries; never automatically open rich-media surfaces for ordinary reports.
 metadata:
-  version: "1.3.0"
+  version: "1.4.0"
   status: "active"
   layer: "task"
   priority: "40"
@@ -28,6 +28,14 @@ A chat widget is not the main conversation. Do not use `talk_render(styleId=chat
 6. For repeated automatic opportunities, unchanged briefs can be suppressed. Explicit user questions always receive a response. Evidence resets on a new user prompt or session branch transition; cross-restart reporting history is not yet persisted.
 
 Passing tests is evidence for those tests, not proof that every requirement is satisfied. Never infer completion merely from an agent run ending or a presentation permit being granted.
+
+## Stage updates and authorization
+
+A stage update is a **non-blocking progress message**, not a task boundary. Continue execution after it within the user's authorized scope. Do not end a run just to announce a commit, passing test count, plan or routine step; do not ask “continue?” when continuation is already authorized.
+
+Send an update only for a consequential new result, changed risk, user decision or real blocker. Suppress unchanged or empty automatic drafts. Explicit user requests still receive an answer. Keep the final answer for delivery, actual blocking input, or a required authorization—not merely a milestone.
+
+Ask only for essential missing input, a changed scope or an operation that actually requires permission. State the specific object, effect and alternatives. Never ask again for permission already granted. Ordinary text reports require no presentation authorization. The explicit formal rich-media gate does not prove factual completion and must not stop normal task execution.
 
 ## Rich media: explicit only
 
