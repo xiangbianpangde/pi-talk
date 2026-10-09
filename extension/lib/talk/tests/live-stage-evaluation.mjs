@@ -42,9 +42,9 @@ try {
    await session.prompt(test.prompt);
    const usage = messages.reduce((a, m) => ({ input: a.input + (m.usage?.input || 0), output: a.output + (m.usage?.output || 0) }), { input: 0, output: 0 });
    const last = session.getLastAssistantText() || "";
-   records.push({ case: test.id, steps, expectedSteps: test.blocked ? [1, 2] : [1, 2, 3], passed: JSON.stringify(steps) === JSON.stringify(test.blocked ? [1, 2] : [1, 2, 3]), assistantMessages: messages.length, elapsedMs: performance.now() - started, usage, finalCharacters: last.length, requestsContinue: allText.some((t) => /shall I continue|是否继续|要我继续|可以继续吗/i.test(t)), prematureEnds: prematureEnds.length, finalPresent: !!last });
+   records.push({ case: test.id, steps, expectedSteps: test.blocked ? [1, 2] : [1, 2, 3], passed: JSON.stringify(steps) === JSON.stringify(test.blocked ? [1, 2] : [1, 2, 3]), assistantMessages: messages.length, elapsedMs: performance.now() - started, usage, finalCharacters: last.length, requestsContinue: allText.some((t) => /shall I continue|是否继续|要我继续|可以继续吗/i.test(t)), prematureEnds: prematureEnds.length, finalPresent: !!last.trim(), requiredInputRequested: !test.blocked || (/(credential|凭据)/i.test(last) && /(provide|need|supply|missing|请提供|需要|缺少)/i.test(last)), falseCompletion: test.blocked && /(?:all stages completed|task (?:is )?complete|全部完成|任务已完成)/i.test(last) });
   } finally { clearTimeout(timer); session.dispose(); }
  }
  console.log(JSON.stringify({ protocol: "live-stage-probe/v1", provider: model.provider, model: model.id, scope: "Three controlled scenarios, current policy only; no old/new causal comparison", records }, null, 2));
- if (records.some((r) => !r.passed || (!r.case.includes("input") && r.requestsContinue))) process.exitCode = 1;
+ if (records.some((r) => !r.passed || !r.finalPresent || r.prematureEnds > 0 || !r.requiredInputRequested || r.falseCompletion || (!r.case.includes("input") && r.requestsContinue))) process.exitCode = 1;
 } finally { rmSync(cwd, { recursive: true, force: true }); }

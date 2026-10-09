@@ -150,7 +150,9 @@ test("information: shadow scenarios preserve decisions, reject fabricated claims
 	paraphraseEngine.begin("verify output");
 	paraphraseEngine.collect("check", "test run", "46 tests passed", false);
 	const paraphrase = paraphraseEngine.refine("partial", [{ text: "all 46 tests passed", kind: "result", status: "observed", evidenceIds: ["check"] }], true);
-	eq(paraphrase.claims[0].status, "observed");
+	eq(paraphrase.claims[0].status, "unverified", "a count does not establish an all qualifier");
+	paraphraseEngine.collect("scope", "test", "tests passed", false);
+	eq(paraphraseEngine.refine("partial", [{ text: "all tests passed", kind: "result", status: "observed", evidenceIds: ["scope"] }]).claims[0].status, "unverified");
 	const negation = paraphraseEngine.refine("partial", [{ text: "46 tests failed", kind: "result", status: "observed", evidenceIds: ["check"] }], true);
 	eq(negation.claims[0].status, "unverified");
 	const wrongNumber = engine.refine("partial", [{ text: "all 47 tests passed", kind: "result", status: "observed", evidenceIds: ["check"] }], true);
@@ -223,6 +225,8 @@ test("information: failure repair and full requirement coverage govern completio
 	const checks = [{ requirementId: "a", evidenceIds: ["pass-a"] }, { requirementId: "b", evidenceIds: ["pass-b"] }];
 	eq(e.refine("completed", claims, true, ["pass-a", "pass-b"], { checks }).state, "partial");
 	const resolutions = [{ failureId: "bad", verificationId: "pass-a" }];
+	const inferredB = [claims[0], { ...claims[1], status: "inferred" as const }];
+	eq(e.refine("completed", inferredB, true, ["pass-a"], { checks, resolutions }).state, "partial", "observed A plus inferred B cannot satisfy all requirements");
 	eq(e.refine("completed", claims, true, ["pass-a", "pass-b"], { checks, resolutions }).state, "completed");
 	eq(e.refine("completed", claims, true, ["pass-a"], { checks: checks.slice(0, 1), resolutions }).state, "partial");
 	eq(e.refine("completed", claims, true, ["pass-a", "pass-b"], { checks, resolutions: [{ failureId: "bad", verificationId: "pass-b" }] }).state, "partial");

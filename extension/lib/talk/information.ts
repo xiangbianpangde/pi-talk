@@ -8,7 +8,7 @@ export interface FailureResolution { failureId: string; verificationId: string }
 export interface AcceptanceMap { checks?: RequirementCheck[]; resolutions?: FailureResolution[] }
 export interface Claim { text: string; kind: "result" | "risk" | "blocker" | "decision"; status: "observed" | "inferred" | "unverified"; evidenceIds: string[]; value?: number }
 export interface Brief { state: TaskState; claims: Claim[]; delivery: "send" | "suppress"; warnings: string[]; reason?: "explicit" | "material-change" | "unchanged" | "insufficient-evidence"; continuation: "continue" }
-const STOPWORDS = new Set(["a", "an", "the", "all", "已", "已完成", "完成", "全部", "所有", "的", "了", "并", "且"]);
+const STOPWORDS = new Set(["a", "an", "the", "已", "已完成", "完成", "的", "了", "并", "且"]);
 const tokens = (value: string) => value.toLowerCase().match(/[a-z0-9]+|[\u4e00-\u9fff]+/g) || [];
 const meaningful = (value: string) => tokens(value).filter((t) => !STOPWORDS.has(t));
 const numbers = (value: string) => (value.match(/\d+(?:\.\d+)?/g) || []).sort();
@@ -96,7 +96,7 @@ export function createInformationEngine() {
 					c.kind === "result" && c.status === "observed" && c.evidenceIds.includes(id)));
 			const coverage = requirements.length > 0 && requirements.every((r) => (mapping.checks || []).some((check) =>
 				check.requirementId === r.id && check.evidenceIds.length > 0 && check.evidenceIds.every((id) =>
-					known.has(id) && !known.get(id)!.failed && !known.get(id)!.truncated && claims.some((c) => c.kind === "result" && c.status !== "unverified" && c.evidenceIds.includes(id)))));
+					acceptanceEvidenceIds.includes(id) && known.has(id) && !known.get(id)!.failed && !known.get(id)!.truncated && claims.some((c) => c.kind === "result" && c.status === "observed" && c.evidenceIds.includes(id)))));
 			if (!coverage) warnings.push("Required acceptance criteria are absent or not fully mapped to successful evidence.");
 			if (state === "completed" && !claims.length) warnings.push("An empty brief cannot establish completion.");
 			// Even a supported claim is not a complete acceptance protocol. The producer
