@@ -144,6 +144,7 @@ test("information: shadow scenarios preserve decisions, reject fabricated claims
 	engine.collect("check", "test run", "all assertions passed", false);
 	const good = engine.refine("completed", [{ text: "all assertions passed", kind: "result", status: "observed", evidenceIds: ["check"] }], true, ["check"]);
 	eq(good.state, "completed");
+	eq(engine.refine("completed", [], true, ["check"]).state, "partial");
 	const fabricated = engine.refine("completed", [{ text: "all requirements met", kind: "result", status: "observed", evidenceIds: ["check"] }], true, ["check"]);
 	eq(fabricated.state, "partial");
 	eq(fabricated.claims[0].status, "unverified");
