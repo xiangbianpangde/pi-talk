@@ -162,6 +162,28 @@ test("information: shadow scenarios preserve decisions, reject fabricated claims
 	eq(engine.refine("completed", []).state, "unknown");
 });
 
+test("information: shadow matrix covers completed, partial, failed, blocked, unchanged and decision cases", () => {
+	const cases = [
+		{ state: "completed" as const, claims: [{ text: "build passed", kind: "result" as const, status: "observed" as const, evidenceIds: ["ok"] }], expected: "completed" },
+		{ state: "partial" as const, claims: [{ text: "one item remains", kind: "risk" as const, status: "inferred" as const, evidenceIds: ["todo"] }], expected: "partial" },
+		{ state: "failed" as const, claims: [{ text: "test failed", kind: "risk" as const, status: "observed" as const, evidenceIds: ["bad"] }], expected: "failed" },
+		{ state: "blocked" as const, claims: [{ text: "needs user choice", kind: "decision" as const, status: "inferred" as const, evidenceIds: [] }], expected: "blocked" },
+	];
+	for (const sample of cases) {
+		const e = createInformationEngine(); e.begin("goal");
+		e.collect(sample.claims[0].evidenceIds[0] || "none", "fixture", sample.claims[0].text, sample.state === "failed");
+		const brief = e.refine(sample.state, sample.claims, true, sample.state === "completed" ? ["ok"] : []);
+		eq(brief.state, sample.expected);
+	}
+	const unchanged = createInformationEngine(); unchanged.begin("goal");
+	unchanged.collect("ok", "fixture", "same", false);
+	const candidate = [{ text: "same", kind: "result" as const, status: "observed" as const, evidenceIds: ["ok"] }];
+	unchanged.refine("partial", candidate, false);
+	eq(unchanged.refine("partial", candidate, false).delivery, "suppress");
+	const decision = unchanged.refine("blocked", [{ text: "Choose target", kind: "decision", status: "inferred", evidenceIds: [] }], true);
+	eq(decision.claims[0].kind, "decision");
+});
+
 test("information: evidence is bounded, redacted, traceable and completion is not self-asserting", () => {
 	const engine = createInformationEngine();
 	engine.begin("ship feature");
