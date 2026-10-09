@@ -13,6 +13,7 @@ import { randomUUID } from "node:crypto";
 import registerTalk from "../../../talk";
 import { createTalkTriggerHandlers, parseTalkArgs, resolveTalkStart, registerTalkLifecycle, createOpportunityRouter } from "../trigger";
 import { createInformationEngine, briefText } from "../information";
+import { deliverBrief } from "../delivery";
 import { auditExplainContent } from "../explain-audit";
 import { parseExplanationPlan, validateExplanationPlan } from "../explain/validate";
 import { compileExplanation, plainText, renderMarkdownLite, thesisOf } from "../explain/render";
@@ -136,6 +137,20 @@ test("trigger: lifecycle resets permit, stops in order and only appends while ac
 	handlers.agentStart();
 	await handlers.sessionShutdown();
 	eq(calls.join(","), "reset,reset,stop");
+});
+
+test("delivery: routine suppression, material send and explicit override share one boundary", async () => {
+	const sent: string[] = [];
+	const target = { publish: async (content: string) => { sent.push(content); } };
+	const engine = createInformationEngine(); engine.begin("goal");
+	const routine = engine.refine("partial", [{ text: "commit recorded", kind: "result", status: "inferred", evidenceIds: [] }], false, [], {}, "routine");
+	const suppressed = await deliverBrief(routine, target);
+	eq(suppressed.sent, false); eq(suppressed.continuation, "continue"); eq(sent.length, 0);
+	const outcome = engine.refine("partial", [{ text: "new risk found", kind: "risk", status: "inferred", evidenceIds: [] }], false);
+	const delivered = await deliverBrief(outcome, target);
+	eq(delivered.sent, true); eq(sent.length, 1);
+	const explicit = await deliverBrief(routine, target, { explicit: true });
+	eq(explicit.sent, true); eq(explicit.reason, "explicit"); eq(sent.length, 2);
 });
 
 test("information: shadow scenarios preserve decisions, reject fabricated claims and reset scope", () => {

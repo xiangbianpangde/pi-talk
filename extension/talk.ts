@@ -6,6 +6,7 @@
  */
 import { createHash } from "node:crypto";
 import { createInformationEngine, briefText } from "./lib/talk/information";
+import { deliverBrief } from "./lib/talk/delivery";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import {
@@ -131,16 +132,22 @@ export default function (pi: ExtensionAPI) {
 		async execute() { const context = { ...information.context(), opportunity }; return { content: [{ type: "text", text: JSON.stringify(context) }], details: context }; },
 	});
 	pi.registerTool({
-		name: "talk_report_brief", label: "Check task brief", description: "Validate and deduplicate main-assistant candidate conclusions against task evidence. Returns a plain-text main-transcript draft; does not publish, open a browser or claim independent verification. No additional model calls.",
+		name: "talk_report_brief", label: "Check task brief", description: "Validate task conclusions and optionally publish one non-blocking main-transcript update. Draft-only by default; publish=true uses send/suppress boundary with no browser or model turn. Never repeat a published update in the final answer. Not independent verification.",
 		parameters: Type.Object({
 			state: Type.Union([Type.Literal("completed"), Type.Literal("partial"), Type.Literal("failed"), Type.Literal("blocked"), Type.Literal("unknown")]),
+			publish: Type.Optional(Type.Boolean({ description: "Publish a non-blocking transcript update after validation; default false. Never use for routine milestones." })),
 			updatePurpose: Type.Optional(Type.Union([Type.Literal("outcome"), Type.Literal("routine")], { description: "Routine milestone/plan/commit chatter is suppressed for automatic opportunities; actual outcomes remain reportable." })),
 			explicit: Type.Optional(Type.Boolean()), acceptanceEvidenceIds: Type.Optional(Type.Array(Type.String())),
 			checks: Type.Optional(Type.Array(Type.Object({ requirementId: Type.String(), evidenceIds: Type.Array(Type.String()) }))),
 			resolutions: Type.Optional(Type.Array(Type.Object({ failureId: Type.String(), verificationId: Type.String() }))),
 			claims: Type.Array(Type.Object({ text: Type.String(), kind: Type.Union([Type.Literal("result"), Type.Literal("risk"), Type.Literal("blocker"), Type.Literal("decision")]), status: Type.Union([Type.Literal("observed"), Type.Literal("inferred"), Type.Literal("unverified")]), evidenceIds: Type.Array(Type.String()) })),
 		}),
-		async execute(_id, params) { const brief = information.refine(params.state, params.claims, params.explicit ?? opportunity?.cause === "explicit", params.acceptanceEvidenceIds, { checks: params.checks, resolutions: params.resolutions }, params.updatePurpose); return { content: [{ type: "text", text: briefText(brief) }], details: brief }; },
+		async execute(_id, params, _signal, _onUpdate, ctx) {
+			const explicit = params.explicit ?? opportunity?.cause === "explicit";
+			const brief = information.refine(params.state, params.claims, explicit, params.acceptanceEvidenceIds, { checks: params.checks, resolutions: params.resolutions }, params.updatePurpose);
+			const delivery = params.publish ? await deliverBrief(brief, { publish: (content) => pi.sendMessage({ customType: "talk-stage-update", content, display: true, details: { state: brief.state, continuation: "continue" } }, { triggerTurn: false }) }, { explicit }) : undefined;
+			return { content: [{ type: "text", text: briefText(brief) || "No material update delivered; continue the authorized task." }], details: { ...brief, delivery } };
+		},
 	});
 
 	pi.registerCommand("talk", {

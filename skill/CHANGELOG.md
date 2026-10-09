@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.6.0
+
+- Add optional non-blocking transcript publication through the validated brief boundary.
+- Suppressed briefs do not create transcript entries; explicit requests can override suppression.
+- Publication does not inject a user prompt, start another model turn, open HTML or require a format picker.
+
 ## 1.5.0
 
 - Suppress producer-classified routine automatic drafts without keyword-based misclassification of real deliverables.
