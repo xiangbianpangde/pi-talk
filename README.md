@@ -11,6 +11,14 @@
 > `/talk` opens a persistent side surface for Pi agents that is **not limited to markdown**.  
 > Styles are evolutionary: start simple, add packs over time without rewriting the core engine.
 
+### Refactor status — not accepted / not frozen
+
+The high-value, text-first reporting refactor is **in progress**. The current rich-media workflow is not its final acceptance baseline: ordinary reports still need a text-first policy, the Information Engine is not implemented, and Trigger compatibility has not passed the full freeze matrix. Do not interpret renderer test counts as evidence that these requirements are complete.
+
+Patch governance now resolves the existing target surface before auditing or checking report authorization. Explicit cross-style patches and unknown targets are rejected. HTML and image permits are reserved synchronously before asynchronous rendering, released on failure, and consumed after a successful render (including successful renders with warnings).
+
+Run isolated regression tests with `node extension/lib/talk/tests/run-tests.mjs`. For release verification use `TALK_REQUIRE_CHROME=1 node extension/lib/talk/tests/run-tests.mjs`; missing Chromium is a failure in release mode, otherwise browser-dependent cases explicitly report SKIP. The runner still depends on locally installed esbuild, parse5 and typebox; it is not yet a portable CI environment. Chromium can fail intermittently on macOS without a usable display context; a failed run is not automatically retried or reported as passing.
+
 ### Overview
 
 `/talk` is an extension for the [Pi coding agent](https://github.com/earendil-works/pi-coding-agent) that provides rich multimodal interaction alongside the main transcript — journal-grade formal reports, interactive UIs, Archify architecture diagrams, whiteboard canvases, code diff comparisons, and a cognitive Explanation Layer.

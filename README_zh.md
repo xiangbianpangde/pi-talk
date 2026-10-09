@@ -7,6 +7,14 @@
 > `/talk` 为 Pi 智能体提供超越纯文本 Markdown 的**富媒体交互侧表面（Side Surface）**。  
 > 样式采用演进式架构：开箱即用，通过样式包持续扩展，无需重写核心引擎。
 
+## 当前重构状态：未验收、未冻结
+
+以高价值信息提炼为核心的文字优先重构仍在进行中。当前富媒体工作流不是最终验收基线：普通汇报尚未切换为文字默认，Information Engine 尚未实现，Trigger 兼容矩阵也尚未达到冻结标准。渲染测试通过数量不代表这些需求已经完成。
+
+Patch 治理现在先解析已存在的目标 Surface，再决定审计规则和报告许可；显式跨样式 Patch 与未知目标会被拒绝。HTML/图片许可会在异步渲染前同步占用，失败释放，成功后消费（包括带 warning 但成功的渲染）。
+
+运行隔离回归：`node extension/lib/talk/tests/run-tests.mjs`。发布验收使用 `TALK_REQUIRE_CHROME=1 node extension/lib/talk/tests/run-tests.mjs`；缺少 Chromium 时发布模式失败，普通模式明确报告 SKIP。当前 runner 仍依赖本机 esbuild、parse5 和 typebox，尚未成为可移植 CI 环境；macOS 无可用显示上下文时 Chromium 可能间歇失败，不会自动重试或伪报通过。
+
 ## 概述
 
 `/talk` 是 [Pi coding agent](https://github.com/earendil-works/pi-coding-agent) 的扩展插件。它在主对话流之外开辟独立的浏览器侧窗口，支持期刊级正式汇报报告、交互式 UI、Archify 架构图、思维画板、多版本代码对比审阅以及认知级分层解释（Explanation Layer）。

@@ -25,6 +25,7 @@ import {
 	pollEvents,
 	reloadStyles,
 	renderTalk,
+	resolvePatchTarget,
 	governedAsReport,
 	resumeSession,
 	recoverOrphanRuntimeFile,
@@ -440,11 +441,14 @@ export default function (pi: ExtensionAPI) {
 			const count = reportGate.imageCount(params.reportPermit);
 			if (!count) return { content: [{ type: "text", text: "Image report blocked: obtain an image-mode permit from talk_prepare_report." }], details: { ok: false, reason: "image-permit-required" } };
 			if (params.pages.length !== count) return { content: [{ type: "text", text: `Expected exactly ${count} image(s), received ${params.pages.length}; permit remains usable.` }], details: { ok: false, reason: "image-count-mismatch" } };
+			const reservation = reportGate.reserve(params.reportPermit, "image");
+			if (!reservation) return { content: [{ type: "text", text: "Image permit is already in use or unavailable." }], details: { ok: false } };
 			try {
 				const artifacts = await exportImageReport(params.pages, getRuntime().sessionId);
-				reportGate.consume(params.reportPermit, "image");
+				reservation.commit();
 				return { content: [{ type: "text", text: `Image report exported (${artifacts.length} PNG + editable SVG):\n${artifacts.map((a, i) => `${i + 1}. ${a.png}\n   ${a.svg}`).join("\n")}` }], details: { ok: true, artifacts } };
 			} catch (error) {
+				reservation.release();
 				return { content: [{ type: "text", text: `Image report failed: ${error instanceof Error ? error.message : String(error)}. Permit remains usable; revise content or conversion environment and retry.` }], details: { ok: false } };
 			}
 		},
@@ -494,10 +498,6 @@ export default function (pi: ExtensionAPI) {
 		}),
 		async execute(_id, params) {
 			const rt = getRuntime();
-			const style = getStyleById(rt.styles, params.styleId || rt.styleId);
-			if (governedAsReport(style) && !reportGate.allowed(params.reportPermit, "html")) {
-				return { content: [{ type: "text", text: "Formal report blocked: finish all work, pass acceptance checks, then call talk_prepare_report to ask the user for this report's type." }], details: { ok: false, reason: "report-permit-required" } };
-			}
 			let meta: Record<string, unknown> | undefined;
 			if (params.metaJson) {
 				try {
@@ -509,7 +509,19 @@ export default function (pi: ExtensionAPI) {
 					};
 				}
 			}
-			const result = await renderTalk(
+			const target = resolvePatchTarget({ content: params.content, styleId: params.styleId, surface: params.surface, patch: params.patch, meta }, rt);
+			if (target?.error) {
+				return { content: [{ type: "text", text: target.error }], details: { ok: false, reason: "invalid-patch-target" } };
+			}
+			const style = target?.style || getStyleById(rt.styles, params.styleId || rt.styleId);
+			if (governedAsReport(style) && !reportGate.allowed(params.reportPermit, "html")) {
+				return { content: [{ type: "text", text: "Formal report blocked: obtain an HTML report permit before modifying a report surface." }], details: { ok: false, reason: "report-permit-required" } };
+			}
+			const reservation = governedAsReport(style) ? reportGate.reserve(params.reportPermit, "html") : undefined;
+			if (governedAsReport(style) && !reservation) return { content: [{ type: "text", text: "HTML permit is already in use or unavailable." }], details: { ok: false } };
+			let result;
+			try {
+			result = await renderTalk(
 				{
 					content: params.content,
 					styleId: params.styleId,
@@ -522,10 +534,12 @@ export default function (pi: ExtensionAPI) {
 				},
 				rt,
 			);
-			const audit = result.details?.audit as { warnings?: unknown[] } | undefined;
-			if (governedAsReport(style) && result.ok && (!audit?.warnings || audit.warnings.length === 0)) {
-				reportGate.consume(params.reportPermit, "html");
+			} catch (error) {
+				reservation?.release();
+				throw error;
 			}
+			if (result.ok) reservation?.commit();
+			else reservation?.release();
 			return {
 				content: [
 					{

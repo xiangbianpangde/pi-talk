@@ -1,5 +1,6 @@
 /** /talk regression suite. All runtime data lives in a disposable home. */
 import { execFileSync } from "node:child_process";
+import { createRequire } from "node:module";
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join, dirname } from "node:path";
@@ -10,6 +11,9 @@ const extensionDir = join(here, "..", "..", "..");
 const agentDir = join(homedir(), ".pi", "agent");
 const esbuildPath = join(agentDir, "npm", "node_modules", "esbuild", "lib", "main.js");
 const parse5Path = join(agentDir, "npm", "node_modules", "parse5", "dist", "index.js");
+const require = createRequire(import.meta.url);
+// Resolve the real schema library, never a registration-only mock.
+const typeboxPath = require.resolve("typebox", { paths: [extensionDir, join(agentDir, "npm"), join(agentDir, "npm", "node_modules", "pi-subagents"), process.env.PI_PACKAGE_DIR || extensionDir] });
 const checkoutStyles = join(extensionDir, "..", "styles");
 const sourceStyles = existsSync(checkoutStyles) ? checkoutStyles : join(agentDir, "talk", "styles");
 
@@ -44,6 +48,7 @@ try {
 		absWorkingDir: extensionDir,
 		plugins: [{ name: "resolve-pi-parse5", setup(build) {
 			build.onResolve({ filter: /\.\.\/\.\.\/\.\.\/npm\/node_modules\/parse5\/dist\/index\.js$/ }, () => ({ path: parse5Path }));
+			build.onResolve({ filter: /^typebox$/ }, () => ({ path: typeboxPath }));
 		} }], logLevel: "silent",
 	});
 	console.log("# Isolated talk test home: " + home);

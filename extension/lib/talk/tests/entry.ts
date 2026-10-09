@@ -10,6 +10,7 @@ import { renderImageReportSvg } from "../report-image/render";
 import { exportImageReport } from "../report-image/export";
 import { getSessionDir } from "../paths";
 import { randomUUID } from "node:crypto";
+import registerTalk from "../../../talk";
 import { createTalkTriggerHandlers, parseTalkArgs, resolveTalkStart, registerTalkLifecycle } from "../trigger";
 import { auditExplainContent } from "../explain-audit";
 import { parseExplanationPlan, validateExplanationPlan } from "../explain/validate";
@@ -20,6 +21,7 @@ import { resolveChrome, chromeCapture } from "../verify";
 import {
 	getRuntime,
 	renderTalk,
+	resolvePatchTarget,
 	startSession,
 	stopSession,
 	listSessions,
@@ -35,7 +37,8 @@ import { tmpdir, homedir } from "node:os";
 import { request as httpRequest } from "node:http";
 import { join } from "node:path";
 
-const results: Array<{ name: string; ok: boolean; error?: string }> = [];
+class TestSkipped extends Error {}
+const results: Array<{ name: string; ok: boolean; skipped?: boolean; error?: string }> = [];
 const suite: Array<{ name: string; fn: () => void | Promise<void> }> = [];
 function test(name: string, fn: () => void | Promise<void>): void {
 	suite.push({ name, fn });
@@ -166,6 +169,28 @@ test("audit: shell elements rejected", () => {
 	ok(a.errors.some((e) => e.code === "shell-escape"), "shell flagged");
 });
 
+test("report gate: concurrent renders cannot reserve one permit twice", async () => {
+	const gate = createReportGate();
+	const prepared = await gate.prepare({ summary: "done", checks: ["passed"], remainingWork: [] }, async () => REPORT_CHOICES[0]);
+	ok(prepared.ok);
+	if (!prepared.ok) return;
+	const first = gate.reserve(prepared.id, "html");
+	ok(first);
+	eq(gate.reserve(prepared.id, "html"), undefined);
+	eq(gate.consume(prepared.id, "html"), false);
+	ok(first!.release());
+	const retry = gate.reserve(prepared.id, "html");
+	ok(retry);
+	ok(retry!.commit());
+	eq(gate.allowed(prepared.id), false);
+	eq(retry!.release(), false);
+	const next = await gate.prepare({ summary: "done", checks: ["passed"], remainingWork: [] }, async () => REPORT_CHOICES[0]);
+	if (!next.ok) throw new Error("prepare failed");
+	const stale = gate.reserve(next.id, "html")!;
+	gate.reset();
+	eq(stale.commit(), false, "reset invalidates outstanding reservation");
+});
+
 test("report gate: incomplete or unverified work never prompts", async () => {
 	const gate = createReportGate();
 	let prompts = 0;
@@ -285,7 +310,10 @@ test("image export: count validation and failed conversion roll back whole batch
 	}
 });
 test("image export: real PNG is 1200×1600 and retains SVG", async () => {
-	if (!resolveChrome()) return;
+	if (!resolveChrome()) {
+		if (process.env.TALK_REQUIRE_CHROME === "1") throw new Error("Release verification requires Chromium");
+		throw new TestSkipped("Chromium unavailable; real PNG export was not executed");
+	}
 	const id = randomUUID();
 	try {
 		const artifacts = await exportImageReport([imagePage], id);
@@ -397,6 +425,58 @@ test("session: render persists version + meta", async () => {
 	ok(existsSync(v2File) && readFileSync(v2File, "utf8").includes("v2"), "patch version file on disk");
 	await stopSession(rt);
 });
+test("extension: actual tool registration enforces target permit and rejects cross-style patches", async () => {
+	const tools = new Map<string, any>();
+	const hooks = new Map<string, any>();
+	const commands = new Map<string, any>();
+	registerTalk({ on: (name: string, fn: unknown) => hooks.set(name, fn), registerTool: (tool: any) => tools.set(tool.name, tool), registerCommand: (name: string, cmd: unknown) => commands.set(name, cmd) } as any);
+	ok(commands.has("talk"));
+	eq([...hooks.keys()].join(","), "agent_start,session_shutdown,before_agent_start");
+	for (const name of ["talk_render", "talk_prepare_report", "talk_report_images", "talk_set_style", "talk_status"]) ok(tools.has(name));
+	const rt = getRuntime();
+	await stopSession(rt);
+	await startSession("html-interactive", {}, rt);
+	try {
+		await renderTalk({ content: "<p>original</p>", surface: "main" }, rt);
+		rt.surfaces.get("main")!.styleId = "report";
+		const render = tools.get("talk_render");
+		const invoke = (params: unknown) => render.execute("test", params, undefined, undefined, { hasUI: false });
+		const cross = await invoke({ content: "", styleId: "html-interactive", patch: { selector: "p", surface: "main", html: "changed" } });
+		eq(cross.details.reason, "invalid-patch-target");
+		const implicit = await invoke({ content: "", metaJson: JSON.stringify({ patch: { selector: "p", surface: "main", html: "changed" } }) });
+		eq(implicit.details.reason, "report-permit-required");
+		const prepare = tools.get("talk_prepare_report");
+		eq((await prepare.execute("test", { summary: "done", checks: ["passed"], remainingWork: [] }, undefined, undefined, { hasUI: false })).details.ok, false);
+	} finally { await hooks.get("session_shutdown")(); }
+});
+
+test("patch: target style is authoritative and cross-style requests cannot mutate snapshots", async () => {
+	const rt = getRuntime();
+	await stopSession(rt);
+	await startSession("html-interactive", {}, rt);
+	try {
+		await renderTalk({ content: "<p>original</p>", surface: "main" }, rt);
+		const surface = rt.surfaces.get("main")!;
+		// Isolate the trust boundary without constructing a formal report fixture.
+		surface.styleId = "report";
+		const before = rt.server!.getState("main")!.html;
+		const versions = rt.versionCount;
+		const attack = { content: "", styleId: "html-interactive", patch: { surface: "main", selector: "p", html: "<script>alert(1)</script>" } };
+		ok(resolvePatchTarget(attack, rt)?.error, "cross-style target rejected");
+		const rejected = await renderTalk(attack, rt);
+		eq(rejected.ok, false);
+		eq(rt.server!.getState("main")!.html, before);
+		eq(rt.versionCount, versions);
+		const inherited = resolvePatchTarget({ content: "", meta: { patch: attack.patch } }, rt);
+		eq(inherited?.style?.id, "report", "meta patch also inherits target governance");
+		const unsafe = await renderTalk({ content: "", patch: attack.patch }, rt);
+		eq(unsafe.ok, false, "target report audit rejects script without explicit style");
+		eq(rt.server!.getState("main")!.html, before);
+		eq(rt.versionCount, versions);
+		ok(resolvePatchTarget({ content: "", patch: { selector: "p", surface: "missing" } }, rt)?.error);
+	} finally { await stopSession(rt); }
+});
+
 test("session: input.surface param targets named surface", async () => {
 	const rt = getRuntime();
 	await startSession("html-interactive", {}, rt);
@@ -464,7 +544,10 @@ test("export: report fragment to markdown", () => {
 // ---------- 7. verify (chrome required) ----------
 test("verify: chrome resolution", () => {
 	const chrome = resolveChrome();
-	if (!chrome) throw new Error("no chrome found (set CHROME_PATH)");
+	if (!chrome) {
+		if (process.env.TALK_REQUIRE_CHROME === "1") throw new Error("Release verification requires Chromium (set CHROME_PATH)");
+		throw new TestSkipped("Chromium unavailable; browser resolution was not verified");
+	}
 	ok(existsSync(chrome), "chrome path exists");
 });
 
@@ -973,13 +1056,15 @@ async function main(): Promise<void> {
 			await t.fn();
 			results.push({ name: t.name, ok: true });
 		} catch (error) {
-			results.push({ name: t.name, ok: false, error: error instanceof Error ? error.message : String(error) });
+			results.push({ name: t.name, ok: error instanceof TestSkipped, skipped: error instanceof TestSkipped, error: error instanceof Error ? error.message : String(error) });
 		}
 	}
 	await srv?.close();
 
 	const failed = results.filter((r) => !r.ok);
-	console.log(`# /talk tests: ${results.length - failed.length}/${results.length} passed`);
+	const skipped = results.filter((r) => r.skipped);
+	console.log(`# /talk tests: ${results.length - failed.length - skipped.length}/${results.length} passed; ${skipped.length} skipped`);
+	for (const r of skipped) console.log(`# SKIP ${r.name} — ${r.error}`);
 	for (const r of failed) console.log(`# FAIL ${r.name} — ${r.error}`);
 	process.exit(failed.length ? 1 : 0);
 }

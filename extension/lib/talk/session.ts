@@ -685,10 +685,33 @@ export function runCommand(
 	});
 }
 
+/** Patch governance belongs to the existing target, never the requested style. */
+export function resolvePatchTarget(input: TalkRenderInput, runtime = getRuntime()) {
+	const patch = input.patch ?? (typeof input.meta?.patch === "object" && input.meta.patch !== null
+		? input.meta.patch as TalkPatch : undefined);
+	if (!patch) return undefined;
+	const surface = patch.surface || input.surface ||
+		(typeof input.meta?.surface === "string" ? input.meta.surface : undefined) || runtime.activeSurface;
+	const target = runtime.surfaces.get(surface);
+	if (!runtime.active || !surfaceIdOk(surface) || !target) {
+		return { error: "Patch requires an existing, valid target surface." };
+	}
+	const style = getStyleById(runtime.styles, target.styleId);
+	if (!style) return { error: "Patch target style is unavailable." };
+	if (input.styleId && input.styleId !== target.styleId) {
+		return { error: "Cross-style patch rejected: requested style differs from target surface." };
+	}
+	return { surface, style };
+}
+
 export async function renderTalk(
 	input: TalkRenderInput,
 	runtime = getRuntime(),
 ): Promise<TalkRenderResult> {
+	const patchTarget = resolvePatchTarget(input, runtime);
+	if (patchTarget?.error) {
+		return { ok: false, styleId: input.styleId || runtime.styleId, kind: "html-js", message: patchTarget.error };
+	}
 	if (!runtime.active) {
 		await startSession(
 			input.styleId || runtime.styleId || getDefaultStyleId(runtime.styles),
@@ -696,7 +719,7 @@ export async function renderTalk(
 			runtime,
 		);
 	}
-	const styleId = input.styleId || runtime.styleId || getDefaultStyleId(runtime.styles);
+	const styleId = patchTarget?.style?.id || input.styleId || runtime.styleId || getDefaultStyleId(runtime.styles);
 	const style = getStyleById(runtime.styles, styleId);
 	if (!style) {
 		return {

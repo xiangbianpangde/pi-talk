@@ -12,7 +12,7 @@ export interface ReportCompletion {
 
 /** A one-shot, in-memory authorization. No authorization survives a new agent run. */
 export function createReportGate() {
-	let permit: { id: string; choice: ReportChoice; imageCount?: number } | undefined;
+	let permit: { id: string; choice: ReportChoice; imageCount?: number; reserved?: boolean } | undefined;
 	return {
 		reset() { permit = undefined; },
 		async prepare(completion: ReportCompletion, select: (question: string, options: string[]) => Promise<string | undefined>) {
@@ -36,7 +36,28 @@ export function createReportGate() {
 			return { ok: true as const, ...permit };
 		},
 		allowed(id: string | undefined, mode?: "html" | "image") {
-			return Boolean(id && permit?.id === id && (mode === "html" ? permit.choice !== "一张图汇报" : mode === "image" ? permit.choice === "一张图汇报" : true));
+			return Boolean(id && permit?.id === id && !permit.reserved && (mode === "html" ? permit.choice !== "一张图汇报" : mode === "image" ? permit.choice === "一张图汇报" : true));
+		},
+		/** Reserve synchronously before asynchronous rendering; release on failure. */
+		reserve(id: string | undefined, mode: "html" | "image") {
+			if (!this.allowed(id, mode) || !permit) return undefined;
+			const current = permit;
+			current.reserved = true;
+			let finished = false;
+			return {
+				commit() {
+					if (finished || permit !== current) return false;
+					finished = true;
+					permit = undefined;
+					return true;
+				},
+				release() {
+					if (finished || permit !== current) return false;
+					finished = true;
+					current.reserved = false;
+					return true;
+				},
+			};
 		},
 		imageCount(id: string | undefined) { return this.allowed(id, "image") ? permit?.imageCount : undefined; },
 		consume(id: string | undefined, mode?: "html" | "image") {
