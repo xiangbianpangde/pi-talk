@@ -163,6 +163,26 @@ test("information: shadow scenarios preserve decisions, reject fabricated claims
 	eq(engine.refine("completed", []).state, "unknown");
 });
 
+test("information: immutable requirements and critical versus incidental truncation", () => {
+	const e = createInformationEngine(); e.begin("Implement A and B");
+	const requirements = [{ id: "a", userAnchor: "A", criterion: "A tested" }, { id: "b", userAnchor: "B", criterion: "B tested" }];
+	e.defineRequirements(requirements);
+	let rejected = false;
+	try { e.defineRequirements(requirements.slice(0, 1)); } catch { rejected = true; }
+	ok(rejected, "cannot shrink requirements before evidence arrives");
+	eq(e.context().requirements.length, 2);
+	for (let i = 0; i < 25; i++) e.collect(`log-${i}`, "build log", "x".repeat(4000), false);
+	e.collect("a", "test A", "A passed", false);
+	e.collect("b", "test B", "B passed", false);
+	const claims = [{ text: "A passed", kind: "result" as const, status: "observed" as const, evidenceIds: ["a"] }, { text: "B passed", kind: "result" as const, status: "observed" as const, evidenceIds: ["b"] }];
+	const mapping = { checks: [{ requirementId: "a", evidenceIds: ["a"] }, { requirementId: "b", evidenceIds: ["b"] }] };
+	ok(e.context().incomplete);
+	eq(e.refine("completed", claims, true, ["a", "b"], mapping).state, "completed", "incidental truncated logs do not block intact acceptance");
+	e.begin("Implement A"); e.defineRequirements(requirements.slice(0, 1));
+	e.collect("a", "test A", "A passed" + "x".repeat(4000), false);
+	eq(e.refine("completed", claims.slice(0, 1), true, ["a"], { checks: mapping.checks.slice(0, 1) }).state, "partial", "truncated acceptance blocks completion");
+});
+
 test("information: failure repair and full requirement coverage govern completion", () => {
 	const e = createInformationEngine(); e.begin("Implement A and B");
 	e.defineRequirements([{ id: "a", userAnchor: "A", criterion: "A tested" }, { id: "b", userAnchor: "B", criterion: "B tested" }]);

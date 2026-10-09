@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 
 export type TaskState = "completed" | "partial" | "failed" | "blocked" | "unknown";
-export interface Evidence { id: string; locator: string; text: string; failed: boolean; observedAt: number; checkKey?: string }
+export interface Evidence { id: string; locator: string; text: string; failed: boolean; observedAt: number; checkKey?: string; truncated: boolean }
 export interface Requirement { id: string; userAnchor: string; criterion: string }
 export interface RequirementCheck { requirementId: string; evidenceIds: string[] }
 export interface FailureResolution { failureId: string; verificationId: string }
@@ -17,10 +17,13 @@ export function createInformationEngine() {
 	let previous = "";
 	let incomplete = false;
 	let requirements: Requirement[] = [];
+	let goalIncomplete = false;
+	let droppedFailure = false;
 	return {
-		begin(prompt: string) { goal = prompt.slice(0, 6000); evidence = []; requirements = []; incomplete = prompt.length > 6000; previous = ""; },
+		begin(prompt: string) { goal = prompt.slice(0, 6000); evidence = []; requirements = []; goalIncomplete = prompt.length > 6000; incomplete = goalIncomplete; droppedFailure = false; previous = ""; },
 		/** Producer-authored decomposition, anchored to literal user text, not independently verified coverage. */
 		defineRequirements(items: Requirement[]) {
+			if (requirements.length) throw new Error("Requirements are immutable in this task scope; a changed user scope requires a new task.");
 			if (!goal || evidence.length) throw new Error("Define requirements before executing tools in this task scope.");
 			if (!items.length || items.some((r) => !r.id.trim() || !r.criterion.trim() || !r.userAnchor.trim() || !goal.includes(r.userAnchor)) || new Set(items.map((r) => r.id)).size !== items.length) {
 				throw new Error("Requirements need unique ids, criteria and exact user-goal anchors.");
@@ -32,13 +35,15 @@ export function createInformationEngine() {
 			// Bound context and redact common credentials before exposing it to the producer.
 			const safe = text.replace(/(api[_-]?key|password|token|authorization)\s*[:=]\s*\S+/gi, "$1=[redacted]");
 			if (safe.length > 3000) incomplete = true;
-			evidence.push({ id, locator, text: safe.slice(0, 3000), failed, observedAt: Date.now(), checkKey });
+			evidence.push({ id, locator, text: safe.slice(0, 3000), failed, observedAt: Date.now(), checkKey, truncated: safe.length > 3000 });
 			if (evidence.length > 24) {
 				const index = evidence.findIndex((e) => !e.failed);
-				evidence.splice(index < 0 ? 0 : index, 1); incomplete = true;
+				const removed = evidence.splice(index < 0 ? 0 : index, 1)[0];
+				if (removed.failed) droppedFailure = true;
+				incomplete = true;
 			}
 		},
-		context() { return { goal, requirements: requirements.map((r) => ({ ...r })), evidence: evidence.map((e) => ({ ...e })), incomplete }; },
+		context() { return { goal, requirements: requirements.map((r) => ({ ...r })), evidence: evidence.map((e) => ({ ...e })), incomplete, goalIncomplete, droppedFailure }; },
 		refine(state: TaskState, candidates: Claim[], explicit = true, acceptanceEvidenceIds: string[] = [], mapping: AcceptanceMap = {}): Brief {
 			const warnings: string[] = [];
 			const known = new Map(evidence.map((e) => [e.id, e]));
@@ -59,7 +64,7 @@ export function createInformationEngine() {
 			for (const link of mapping.resolutions || []) {
 				const failure = known.get(link.failureId), verification = known.get(link.verificationId);
 				// Same deterministic tool/input identity and later successful execution.
-				if (failure?.failed && verification && !verification.failed && failure.checkKey && failure.checkKey === verification.checkKey && evidence.indexOf(verification) > evidence.indexOf(failure)) resolved.add(failure.id);
+				if (failure?.failed && verification && !verification.failed && !verification.truncated && failure.checkKey && failure.checkKey === verification.checkKey && evidence.indexOf(verification) > evidence.indexOf(failure)) resolved.add(failure.id);
 				else warnings.push(`Invalid failure resolution: ${link.failureId}`);
 			}
 			const unresolved = evidence.filter((e) => e.failed && !resolved.has(e.id));
@@ -70,20 +75,21 @@ export function createInformationEngine() {
 			}
 			claims.sort((a, b) => (b.value ?? 0) - (a.value ?? 0));
 			const acceptance = acceptanceEvidenceIds.length > 0 && acceptanceEvidenceIds.every((id) =>
-				known.has(id) && !known.get(id)!.failed && claims.some((c) =>
+				known.has(id) && !known.get(id)!.failed && !known.get(id)!.truncated && claims.some((c) =>
 					c.kind === "result" && c.status === "observed" && c.evidenceIds.includes(id)));
 			const coverage = requirements.length > 0 && requirements.every((r) => (mapping.checks || []).some((check) =>
 				check.requirementId === r.id && check.evidenceIds.length > 0 && check.evidenceIds.every((id) =>
-					known.has(id) && !known.get(id)!.failed && claims.some((c) => c.kind === "result" && c.status !== "unverified" && c.evidenceIds.includes(id)))));
+					known.has(id) && !known.get(id)!.failed && !known.get(id)!.truncated && claims.some((c) => c.kind === "result" && c.status !== "unverified" && c.evidenceIds.includes(id)))));
 			if (!coverage) warnings.push("Required acceptance criteria are absent or not fully mapped to successful evidence.");
 			if (state === "completed" && !claims.length) warnings.push("An empty brief cannot establish completion.");
 			// Even a supported claim is not a complete acceptance protocol. The producer
 			// must associate the supplied checks with the user's actual requirements.
-			if (state === "completed" && (!acceptance || !coverage || !claims.length || incomplete || claims.some((c) => c.kind === "blocker" || c.status === "unverified") || unresolved.length > 0)) {
+			if (state === "completed" && (!acceptance || !coverage || !claims.length || goalIncomplete || droppedFailure || claims.some((c) => c.kind === "blocker" || c.status === "unverified") || unresolved.length > 0)) {
 				state = "partial"; warnings.push("Completion not established by this evidence scope.");
 			}
 			if (!goal) { state = "unknown"; warnings.push("No anchored task goal."); }
-			if (incomplete) warnings.push("Evidence context is incomplete.");
+			if (incomplete) warnings.push("Some context was truncated or evicted; completion depends on intact mapped acceptance evidence, not complete historical logs.");
+			if (goalIncomplete || droppedFailure) warnings.push("Critical goal or failure context is missing; completion cannot be established.");
 			const current = fingerprint(JSON.stringify({ state, claims }));
 			const delivery = !explicit && current === previous ? "suppress" : "send";
 			previous = current;
