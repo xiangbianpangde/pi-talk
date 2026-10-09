@@ -29,6 +29,28 @@ export async function resolveTalkStart(args: string, mode: string, deps: {
 	return { styleId, message };
 }
 
+export interface ReportOpportunity {
+	id: string;
+	taskId: string;
+	branchId: string;
+	cause: "explicit" | "settled" | "checkpoint";
+	explicitFormat?: "text" | "image" | "html";
+}
+
+/** Idempotent opportunity normalization; settled is not a completion assertion. */
+export function createOpportunityRouter() {
+	const seen = new Set<string>();
+	return {
+		accept(event: ReportOpportunity) {
+			const key = JSON.stringify([event.branchId, event.taskId, event.id]);
+			if (seen.has(key)) return undefined;
+			seen.add(key);
+			return { ...event };
+		},
+		reset() { seen.clear(); },
+	};
+}
+
 export interface TalkTriggerDependencies {
 	resetPermit(): void;
 	stop(): Promise<void>;

@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 
 export type TaskState = "completed" | "partial" | "failed" | "blocked" | "unknown";
-export interface Evidence { id: string; locator: string; text: string; failed: boolean }
+export interface Evidence { id: string; locator: string; text: string; failed: boolean; observedAt: number }
 export interface Claim { text: string; kind: "result" | "risk" | "blocker" | "decision"; status: "observed" | "inferred" | "unverified"; evidenceIds: string[] }
 export interface Brief { state: TaskState; claims: Claim[]; delivery: "send" | "suppress"; warnings: string[] }
 const fingerprint = (value: string) => createHash("sha256").update(value).digest("hex");
@@ -13,13 +13,13 @@ export function createInformationEngine() {
 	let previous = "";
 	let incomplete = false;
 	return {
-		begin(prompt: string) { goal = prompt; evidence = []; incomplete = false; previous = ""; },
+		begin(prompt: string) { goal = prompt.slice(0, 6000); evidence = []; incomplete = prompt.length > 6000; previous = ""; },
 		collect(id: string, locator: string, text: string, failed: boolean) {
 			if (!goal || evidence.some((e) => e.id === id)) return;
 			// Bound context and redact common credentials before exposing it to the producer.
 			const safe = text.replace(/(api[_-]?key|password|token|authorization)\s*[:=]\s*\S+/gi, "$1=[redacted]");
 			if (safe.length > 3000) incomplete = true;
-			evidence.push({ id, locator, text: safe.slice(0, 3000), failed });
+			evidence.push({ id, locator, text: safe.slice(0, 3000), failed, observedAt: Date.now() });
 			if (evidence.length > 24) {
 				const index = evidence.findIndex((e) => !e.failed);
 				evidence.splice(index < 0 ? 0 : index, 1); incomplete = true;
@@ -46,6 +46,8 @@ export function createInformationEngine() {
 				}
 			}
 			const acceptance = acceptanceEvidenceIds.length > 0 && acceptanceEvidenceIds.every((id) => known.has(id) && !known.get(id)!.failed);
+			// Even a supported claim is not a complete acceptance protocol. The producer
+			// must associate the supplied checks with the user's actual requirements.
 			if (state === "completed" && (!acceptance || incomplete || claims.some((c) => c.kind === "blocker" || c.status === "unverified") || evidence.some((e) => e.failed))) {
 				state = "partial"; warnings.push("Completion not established by this evidence scope.");
 			}

@@ -11,7 +11,7 @@ import { exportImageReport } from "../report-image/export";
 import { getSessionDir } from "../paths";
 import { randomUUID } from "node:crypto";
 import registerTalk from "../../../talk";
-import { createTalkTriggerHandlers, parseTalkArgs, resolveTalkStart, registerTalkLifecycle } from "../trigger";
+import { createTalkTriggerHandlers, parseTalkArgs, resolveTalkStart, registerTalkLifecycle, createOpportunityRouter } from "../trigger";
 import { createInformationEngine, briefText } from "../information";
 import { auditExplainContent } from "../explain-audit";
 import { parseExplanationPlan, validateExplanationPlan } from "../explain/validate";
@@ -56,6 +56,16 @@ test("isolation: session writes stay inside the disposable test home", () => {
 	ok(expected, "tests must run through the isolated runner");
 	eq(homedir(), expected!);
 	ok(getSessionDir("isolation-probe").startsWith(join(expected!, ".pi", "agent", "talk", "sessions")));
+});
+
+test("trigger: opportunity replay deduplicates retries without claiming completion", () => {
+	const router = createOpportunityRouter();
+	const event = { id: "run-1", taskId: "task", branchId: "a", cause: "settled" as const };
+	ok(router.accept(event));
+	eq(router.accept(event), undefined);
+	ok(router.accept({ ...event, branchId: "b" }));
+	router.reset();
+	ok(router.accept(event));
 });
 
 test("trigger: argument parsing preserves legacy whitespace and case", () => {
@@ -468,8 +478,9 @@ test("session: render persists version + meta", async () => {
 test("extension: actual tool registration enforces target permit and rejects cross-style patches", async () => {
 	const tools = new Map<string, any>();
 	const hooks = new Map<string, any>();
+	const hookLists = new Map<string, any[]>();
 	const commands = new Map<string, any>();
-	registerTalk({ on: (name: string, fn: unknown) => hooks.set(name, fn), registerTool: (tool: any) => tools.set(tool.name, tool), registerCommand: (name: string, cmd: unknown) => commands.set(name, cmd) } as any);
+	registerTalk({ on: (name: string, fn: unknown) => { hooks.set(name, fn); hookLists.set(name, [...(hookLists.get(name) || []), fn]); }, registerTool: (tool: any) => tools.set(tool.name, tool), registerCommand: (name: string, cmd: unknown) => commands.set(name, cmd) } as any);
 	ok(commands.has("talk"));
 	const rtBefore = getRuntime();
 	await stopSession(rtBefore);
@@ -485,6 +496,13 @@ test("extension: actual tool registration enforces target permit and rejects cro
 	ok(!rtBefore.server, "ordinary reports do not start a server");
 	eq([...hooks.keys()].join(","), "agent_start,session_shutdown,before_agent_start,tool_result,session_before_switch,session_before_fork,session_tree");
 	for (const name of ["talk_render", "talk_prepare_report", "talk_report_images", "talk_set_style", "talk_status"]) ok(tools.has(name));
+	for (const fn of hookLists.get("before_agent_start")!) await fn({ prompt: "verify feature", systemPrompt: "base" });
+	await hooks.get("tool_result")({ toolName: "bash", toolCallId: "observed", content: [{ type: "text", text: "passed" }], isError: false });
+	const context = await tools.get("talk_report_context").execute();
+	eq(context.details.goal, "verify feature");
+	eq(context.details.evidence.length, 1);
+	await hooks.get("session_before_fork")();
+	eq((await tools.get("talk_report_context").execute()).details.evidence.length, 0);
 	const rt = getRuntime();
 	await stopSession(rt);
 	await startSession("html-interactive", {}, rt);
