@@ -3,6 +3,7 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { performance } from "node:perf_hooks";
+import { createHash } from "node:crypto";
 import { createInformationEngine } from "../information";
 
 const root = process.env.TALK_HISTORY_ROOT || join(homedir(), ".pi", "agent", "sessions");
@@ -12,6 +13,8 @@ const files = readdirSync(root, { withFileTypes: true }).filter((d) => d.isDirec
 	return readdirSync(dir).filter((f) => f.endsWith(".jsonl")).map((f) => join(dir, f));
 }).sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs);
 const samples: any[] = [];
+const seenTaskFingerprints = new Set<string>();
+const fingerprint = (goal: string, tools: any[]) => createHash("sha256").update(JSON.stringify([goal.trim().replace(/\s+/g, " "), tools.map((t) => [t.toolName, !!t.isError, text(t.content).slice(0, 500)])])).digest("hex");
 let sessions = 0;
 for (const file of files) {
 	if (samples.length >= 20) break;
@@ -39,6 +42,9 @@ for (const file of files) {
 	for (const task of tasks) {
 		if (samples.length >= 20 || used >= 2) break;
 		if (!task || !task.goal.trim() || !task.tools.length || !task.final || task.goal.length > 6000) continue;
+		const taskFingerprint = fingerprint(task.goal, task.tools);
+		if (seenTaskFingerprints.has(taskFingerprint)) continue;
+		seenTaskFingerprints.add(taskFingerprint);
 		const engine = createInformationEngine(); engine.begin(task.goal);
 		const start = performance.now();
 		for (const t of task.tools) engine.collect(t.toolCallId, t.toolName, text(t.content), !!t.isError, JSON.stringify(task.calls.get(t.toolCallId) || [t.toolName, t.toolCallId]));
@@ -49,7 +55,7 @@ for (const file of files) {
 		const automatic = engine.refine("partial", candidates, false);
 		const repeat = engine.refine("partial", candidates, false);
 		const explicit = engine.refine("partial", candidates, true);
-		samples.push({ case: `H${String(samples.length + 1).padStart(2, "0")}`, toolResults: task.tools.length, failures: task.tools.filter((t) => t.isError).length, retainedFailures: context.evidence.filter((e) => e.failed).length, droppedFailure: context.droppedFailure, truncatedRecords: context.evidence.filter((e) => e.truncated).length, contextIncomplete: context.incomplete, historicalReplyCharacters: text(task.final.content).length, evidenceContextCharacters: JSON.stringify(context).length, historicalFinalDurationMs: task.final.durationMs ?? null, historicalUsage: task.final.usage ? { input: task.final.usage.input, output: task.final.usage.output } : null, replayMs: performance.now() - start, fabricatedCompletionRejected: brief.state !== "completed", unchangedSuppressed: repeat.delivery === "suppress", explicitSent: explicit.delivery === "send", automaticRiskCount: automatic.claims.filter((c) => c.kind === "risk").length });
+		samples.push({ case: `H${String(samples.length + 1).padStart(2, "0")}`, fingerprint: taskFingerprint.slice(0, 12), toolResults: task.tools.length, failures: task.tools.filter((t) => t.isError).length, retainedFailures: context.evidence.filter((e) => e.failed).length, droppedFailure: context.droppedFailure, truncatedRecords: context.evidence.filter((e) => e.truncated).length, contextIncomplete: context.incomplete, historicalReplyCharacters: text(task.final.content).length, evidenceContextCharacters: JSON.stringify(context).length, historicalFinalDurationMs: task.final.durationMs ?? null, historicalUsage: task.final.usage ? { input: task.final.usage.input, output: task.final.usage.output } : null, replayMs: performance.now() - start, fabricatedCompletionRejected: brief.state !== "completed", unchangedSuppressed: repeat.delivery === "suppress", explicitSent: explicit.delivery === "send", automaticRiskCount: automatic.claims.filter((c) => c.kind === "risk").length });
 		used++;
 	}
 	if (used) sessions++;
