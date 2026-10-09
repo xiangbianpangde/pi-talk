@@ -12,6 +12,7 @@ import { getSessionDir } from "../paths";
 import { randomUUID } from "node:crypto";
 import registerTalk from "../../../talk";
 import { createTalkTriggerHandlers, parseTalkArgs, resolveTalkStart, registerTalkLifecycle } from "../trigger";
+import { createInformationEngine, briefText } from "../information";
 import { auditExplainContent } from "../explain-audit";
 import { parseExplanationPlan, validateExplanationPlan } from "../explain/validate";
 import { compileExplanation, plainText, renderMarkdownLite, thesisOf } from "../explain/render";
@@ -124,6 +125,44 @@ test("trigger: lifecycle resets permit, stops in order and only appends while ac
 	handlers.agentStart();
 	await handlers.sessionShutdown();
 	eq(calls.join(","), "reset,reset,stop");
+});
+
+test("information: shadow scenarios preserve decisions, reject fabricated claims and reset scope", () => {
+	const engine = createInformationEngine();
+	engine.begin("verify output");
+	engine.collect("check", "test run", "all assertions passed", false);
+	const good = engine.refine("completed", [{ text: "all assertions passed", kind: "result", status: "observed", evidenceIds: ["check"] }], true, ["check"]);
+	eq(good.state, "completed");
+	const fabricated = engine.refine("completed", [{ text: "all requirements met", kind: "result", status: "observed", evidenceIds: ["check"] }], true, ["check"]);
+	eq(fabricated.state, "partial");
+	eq(fabricated.claims[0].status, "unverified");
+	const blocked = engine.refine("blocked", [
+		{ text: "Choose deployment target", kind: "decision", status: "inferred", evidenceIds: [] },
+		{ text: "Choose deployment target", kind: "decision", status: "inferred", evidenceIds: [] },
+	]);
+	eq(blocked.claims.length, 1);
+	eq(blocked.state, "blocked");
+	engine.collect("large", "read", "x".repeat(4000), false);
+	ok(engine.context().incomplete);
+	engine.begin("new goal");
+	eq(engine.context().evidence.length, 0);
+	engine.begin("");
+	eq(engine.refine("completed", []).state, "unknown");
+});
+
+test("information: evidence is bounded, redacted, traceable and completion is not self-asserting", () => {
+	const engine = createInformationEngine();
+	engine.begin("ship feature");
+	engine.collect("t1", "bash", "password=secret result ready", false);
+	engine.collect("t2", "test", "failed assertion", true);
+	const context = engine.context();
+	eq(context.evidence[0].text.includes("secret"), false);
+	const brief = engine.refine("completed", [{ text: "result ready", kind: "result", status: "observed", evidenceIds: ["t1"] }], true, ["missing"]);
+	eq(brief.state, "partial");
+	ok(brief.claims.some((c) => c.kind === "risk"));
+	ok(briefText(brief).includes("partial"));
+	const same = engine.refine("partial", brief.claims, false);
+	eq(same.delivery, "suppress");
 });
 
 // ---------- 1. registry ----------
@@ -271,6 +310,7 @@ test("image report: valid SVG is escaped, sized and traceable", () => {
 	ok(svg.includes("本地自动化验收"));
 	ok(svg.includes("02") && svg.includes("01"));
 	ok(!svg.includes("<验收>"));
+	ok(renderImageReportSvg({ ...imagePage, insights: [] }).includes("1200"), "no invented insights required");
 });
 test("image report: missing provenance, overflow and arbitrary keys fail closed", () => {
 	for (const bad of [
@@ -279,7 +319,7 @@ test("image report: missing provenance, overflow and arbitrary keys fail closed"
 		{ ...imagePage, code: "<script/>" },
 		{ ...imagePage, title: "坏字符\uD800" },
 		{ ...imagePage, source: "path\u202Egnp" },
-		{ ...imagePage, insights: [] },
+		{ ...imagePage, insights: Array(5).fill(imagePage.insights[0]) },
 	]) {
 		let failed = false;
 		try { renderImageReportSvg(bad); } catch { failed = true; }
@@ -431,7 +471,19 @@ test("extension: actual tool registration enforces target permit and rejects cro
 	const commands = new Map<string, any>();
 	registerTalk({ on: (name: string, fn: unknown) => hooks.set(name, fn), registerTool: (tool: any) => tools.set(tool.name, tool), registerCommand: (name: string, cmd: unknown) => commands.set(name, cmd) } as any);
 	ok(commands.has("talk"));
-	eq([...hooks.keys()].join(","), "agent_start,session_shutdown,before_agent_start");
+	const rtBefore = getRuntime();
+	await stopSession(rtBefore);
+	const sent: string[] = [];
+	// Replace only delivery; command routing and session implementation are real.
+	const fakePi = { on: () => {}, registerTool: () => {}, registerCommand: (name: string, cmd: any) => commands.set(name, cmd), sendUserMessage: async (text: string) => { sent.push(text); } };
+	registerTalk(fakePi as any);
+	const textCtx = { mode: "tui", ui: { select: () => { throw new Error("Unexpected picker"); }, notify: () => {} } };
+	await commands.get("talk").handler("", textCtx);
+	await commands.get("talk").handler("summarize results", textCtx);
+	eq(sent.length, 2);
+	eq(rtBefore.active, false, "ordinary reports do not start side sessions");
+	ok(!rtBefore.server, "ordinary reports do not start a server");
+	eq([...hooks.keys()].join(","), "agent_start,session_shutdown,before_agent_start,tool_result,session_before_switch,session_before_fork,session_tree");
 	for (const name of ["talk_render", "talk_prepare_report", "talk_report_images", "talk_set_style", "talk_status"]) ok(tools.has(name));
 	const rt = getRuntime();
 	await stopSession(rt);

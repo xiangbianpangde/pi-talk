@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.2.0
+
+- Ordinary reports use the main transcript with no format picker, session or browser.
+- Add bounded task-evidence context and conservative brief checks; no background model calls.
+- Restrict rich-media permissions and templates to explicit requests; diagrams are optional.
+- Document ephemeral evidence scope and distinguish observation from independent verification.
+
 ## 1.1.0
 
 - Add the governed 一张图汇报 route: ask for 1–5 pages and use an image-only permit with `talk_report_images`.

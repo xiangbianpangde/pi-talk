@@ -1443,7 +1443,7 @@ export function buildTalkSystemAppendix(runtime = getRuntime()): string {
 You are in an interactive multimodal talk session with the user.
 
 Current style: **${runtime.styleId}** (${style?.kind ?? "?"}) — ${style?.description ?? ""}
-Base/default style for new sessions: **${getDefaultStyleId(runtime.styles)}** (reference-derived formal report design system: paper palette + sidebar + serif hierarchy + KPI/evidence/verdict).
+Ordinary reporting defaults to the MAIN transcript, without starting a session or asking for a format. This active surface is for explicitly requested rich media only.
 ${runtime.url ? `Surface URL: ${runtime.url}` : ""}
 ${runtime.file ? `Latest file: ${runtime.file}` : ""}
 
@@ -1476,10 +1476,10 @@ ${runtime.file ? `Latest file: ${runtime.file}` : ""}
 - Use \`talk_verify\` after rendering (or \`verify: true\` on talk_render): it screenshots the surface headlessly and reports console errors + DOM stats, then you can describe the screenshot to check the real appearance — never ship a blind render.
 
 ### Style guidance
-- **chat**: put the full reply text in talk_render content; keep it readable. Also answer briefly in the main chat.
+- **chat**: optional side-widget conversation only when explicitly requested; ordinary reports stay entirely in the main transcript.
 - **html-static**: pass an HTML fragment or full document. No JS bridge.
 - **html-interactive**: ONLY for light clickable prototypes / choice UIs. Its default shell is plain white cards — NEVER use it for 汇报/结项/周报/阶段验收 pages (those look ugly). Prefer **report**.
-- **report**: the ONLY formal-report shell for 汇报/结项/周报/阶段说明/验收/评审/审计. Never create HTML progress reports while work, external decisions or verification remain. After full acceptance, call talk_prepare_report to ask the user for this report's type, then author accordingly and pass its reportPermit to talk_render. Do not bypass via html-static/html-interactive. Use .hero/.sec-head/.kpi/.card/.tbl-wrap/.note/.tl/.verdict and fix all audit issues. Cookbook: ~/.pi/agent/talk/styles/report/COOKBOOK.md
+- **report**: preserved design system ONLY for explicitly requested formal HTML. Ordinary 汇报/结项/周报/阶段说明/验收/评审/审计 remain main-transcript text. Its explicit formal mode still uses talk_prepare_report and a reportPermit. Do not bypass via raw HTML or cross-style patches. Cookbook: ~/.pi/agent/talk/styles/report/COOKBOOK.md
 - **arch**: architecture diagrams via local Archify (tt-a1i/archify ← Cocoon generator). content = Archify JSON IR (preferred), full HTML, or Mermaid. Types: architecture/workflow/sequence/dataflow/lifecycle. Cookbook: ~/.pi/agent/talk/styles/arch/COOKBOOK.md
 - **draw**: content is newline-separated draw.sh ops (ensure, rect, text, arrow, snapshot, clear). Prefer small labeled sketches.
 - If the active style is wrong for the content, call talk_set_style then re-render; do not keep piling content into the wrong shell.

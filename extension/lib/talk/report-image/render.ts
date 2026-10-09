@@ -47,7 +47,7 @@ export function validateImageReportPage(input: unknown): ImageReportPage {
 			const m = object(v, `metrics[${i}]`, ["value", "label"]);
 			return { value: textField(m.value, `metrics[${i}].value`, 15), label: textField(m.label, `metrics[${i}].label`, 22) };
 		}),
-		insights: entries(p.insights, "insights", 2, 4).map((v, i) => {
+		insights: entries(p.insights, "insights", 0, 4).map((v, i) => {
 			const c = object(v, `insights[${i}]`, ["title", "body"]);
 			return { title: textField(c.title, `insights[${i}].title`, 24), body: textField(c.body, `insights[${i}].body`, 80) };
 		}),

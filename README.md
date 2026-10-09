@@ -13,7 +13,7 @@
 
 ### Refactor status — not accepted / not frozen
 
-The high-value, text-first reporting refactor is **in progress**. The current rich-media workflow is not its final acceptance baseline: ordinary reports still need a text-first policy, the Information Engine is not implemented, and Trigger compatibility has not passed the full freeze matrix. Do not interpret renderer test counts as evidence that these requirements are complete.
+The text-first MVP is implemented: bare/message-only `/talk` sends a main-transcript request with no picker or side session. `talk_report_context` collects bounded task evidence and `talk_report_brief` conservatively checks the main assistant's candidate claims, preserving failures and suppressing duplicate automatic drafts. There are no background model calls. Observation is not independent verification. Evidence is ephemeral and resets with a new prompt or branch; cross-restart history and real-case semantic/cost benchmarks remain unaccepted. Trigger's legacy helpers remain stable, but the full lifecycle freeze matrix is not yet complete. Do not interpret renderer test counts as final acceptance.
 
 Patch governance now resolves the existing target surface before auditing or checking report authorization. Explicit cross-style patches and unknown targets are rejected. HTML and image permits are reserved synchronously before asynchronous rendering, released on failure, and consumed after a successful render (including successful renders with warnings).
 
@@ -33,7 +33,7 @@ Run isolated regression tests with `node extension/lib/talk/tests/run-tests.mjs`
 ### Key Features
 
 1. **Evolutionary Style System (12+ Styles)**
-   - `report` (default): Journal-style formal HTML report design system (paper palette, serif hierarchy, KPI, cards, evidence tables, timeline, verdict).
+   - `report` (explicit formal HTML): Journal-style formal HTML report design system (paper palette, serif hierarchy, KPI, cards, evidence tables, timeline, verdict).
    - `talk_report_images`: Governed one-page image reporting; after completion and acceptance, choose 1–5 pages and generate editable 1200×1600 SVG plus PNG. Contract: `extension/lib/talk/report-image/DESIGN_SYSTEM.md`.
    - `explain`: Dedicated pedagogical explanation design system (distraction-free 68ch single-column layout, 100% directly visible, zero forced details folding, analogy breakage guards, inline checks).
    - `arch`: Interactive architecture, dataflow, sequence, and system maps via Archify.
@@ -98,7 +98,7 @@ Run isolated regression tests with `node extension/lib/talk/tests/run-tests.mjs`
 
 | Command | Description |
 |---------|-------------|
-| `/talk` | Open interactive style picker and start session |
+| `/talk` | Request a concise report in the main transcript; no picker or side session |
 | `/talk report …` | Start session with specific style and initial content |
 | `/talk styles` | List all discovered styles and capabilities |
 | `/talk style <id>` | Switch active style on the fly |
@@ -163,7 +163,7 @@ The regression suite covers report completion/type selection, the talk engine, a
 ### 核心特性
 
 1. **演进式样式系统（12+ 款样式）**
-   - `report`（默认基础样式）：期刊式正式 HTML 汇报报告系统（温暖纸张色调、衬线字体层级、KPI 统计、卡片、证据表格、时间线、结论框）。
+   - `report`（显式正式 HTML 样式）：期刊式正式 HTML 汇报报告系统（温暖纸张色调、衬线字体层级、KPI 统计、卡片、证据表格、时间线、结论框）。
    - `talk_report_images`：正式「一张图汇报」模式；完成任务并验收后，选择 1–5 张，生成 SVG + PNG。
    - `explain`：专属概念精解设计系统（68ch 单栏沉浸阅读、100% 平铺直陈、零强制折叠、直觉类比破壁、代码走读与内嵌自测）。
    - `arch`：交互式架构图、时序图、数据流图与系统生命周期图（基于 Archify）。

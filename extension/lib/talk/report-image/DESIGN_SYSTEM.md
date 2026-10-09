@@ -12,7 +12,7 @@
 
 ## 内容预算与失败策略
 
-工具 `talk_report_images` 的 `pages` 数量必须与提问时用户所选一致。单页要求 `kicker/title/takeaway/insights/evidence/caveat/source`，可选 `metrics`。上限：标题 34 字、结论 95 字、4 张卡（标题 24、正文 80）、3 条证据（每条 52）；实际换行以字形宽度近似计算，超过容器行数直接拒绝，不静默裁切。内容过多时先重写摘要；若需要更多页面，重新征询用户，不绕过选定数量。
+工具 `talk_report_images` 的 `pages` 数量必须与提问时用户所选一致。单页要求 `kicker/title/takeaway/evidence/caveat/source`，`insights` 可按实际信息价值提供 0–4 条，可选 `metrics`。上限：标题 34 字、结论 95 字、4 张卡（标题 24、正文 80）、3 条证据（每条 52）；实际换行以字形宽度近似计算，超过容器行数直接拒绝，不静默裁切。内容过多时先重写摘要；若需要更多页面，重新征询用户，不绕过选定数量。
 
 图像模式复用任务完成和验收通过的 `talk_prepare_report` 一次性许可；用户取消不出图。批量全部转换并核对 PNG 尺寸后才消费许可；任一失败删除整个批次并允许修正重试。生成文件位于会话 `exports/image-report-*/`，每页一份 `.svg` 和 `.png`。与 HTML 报告互不通用，HTML 许可不能用于图片，反之亦然。
 

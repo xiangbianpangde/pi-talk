@@ -1,6 +1,6 @@
 # Style usage and pack authoring
 
-The entry skill owns report-completion policy and tool routing. This reference covers the independent lifecycle of non-report styles and new style packs. Formal reports always follow the `talk_prepare_report` gate in `../SKILL.md`.
+The entry skill owns report-completion policy and tool routing. This reference covers the independent lifecycle of non-report styles and new style packs. Only explicitly requested formal rich-media reports follow the `talk_prepare_report` gate in `../SKILL.md`; ordinary reports stay in the main transcript.
 
 ## Builtin styles
 
