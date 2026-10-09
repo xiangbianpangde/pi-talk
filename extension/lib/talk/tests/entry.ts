@@ -505,6 +505,14 @@ test("extension: actual tool registration enforces target permit and rejects cro
 	eq(context.details.opportunity.cause, "explicit");
 	eq(context.details.opportunity.explicitFormat, "text");
 	eq(context.details.evidence.length, 1);
+	const settledCtx = { sessionManager: { getLeafId: () => "branch", getSessionId: () => "session" } };
+	await hooks.get("agent_settled")({ aborted: false }, settledCtx);
+	const settledContext = (await tools.get("talk_report_context").execute()).details;
+	eq(settledContext.opportunity.cause, "settled");
+	await hooks.get("agent_settled")({ aborted: false }, settledCtx);
+	eq((await tools.get("talk_report_context").execute()).details.opportunity.id, settledContext.opportunity.id);
+	await hooks.get("agent_settled")({ aborted: true }, settledCtx);
+	eq((await tools.get("talk_report_context").execute()).details.opportunity.id, settledContext.opportunity.id);
 	await hooks.get("session_before_fork")();
 	eq((await tools.get("talk_report_context").execute()).details.evidence.length, 0);
 	const rt = getRuntime();
