@@ -1,0 +1,64 @@
+/** Compatibility-only trigger primitives. No information or presentation policy. */
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+export function parseTalkArgs(args: string): { sub?: string; rest: string } {
+	const trimmed = args.trim();
+	if (!trimmed) return { rest: "" };
+	const sp = trimmed.indexOf(" ");
+	if (sp < 0) return { sub: trimmed.toLowerCase(), rest: "" };
+	return { sub: trimmed.slice(0, sp).toLowerCase(), rest: trimmed.slice(sp + 1).trim() };
+}
+
+/** Keep bare-TUI picker fallback and message-only defaults exactly as before. */
+export async function resolveTalkStart(args: string, mode: string, deps: {
+	hasStyle(id: string): boolean;
+	defaultStyle(): string | undefined;
+	pickStyle(): Promise<string | undefined>;
+}): Promise<{ styleId: string | undefined; message: string }> {
+	const { sub, rest } = parseTalkArgs(args);
+	let styleId: string | undefined;
+	let message = "";
+	if (sub && deps.hasStyle(sub)) {
+		styleId = sub;
+		message = rest;
+	} else if (sub) message = args.trim();
+	if (!styleId) {
+		styleId = mode === "tui" && !message
+			? (await deps.pickStyle()) || deps.defaultStyle()
+			: deps.defaultStyle();
+	}
+	return { styleId, message };
+}
+
+export interface TalkTriggerDependencies {
+	resetPermit(): void;
+	stop(): Promise<void>;
+	isActive(): boolean;
+	appendix(): string;
+}
+
+export function registerTalkLifecycle(pi: Pick<ExtensionAPI, "on">, deps: TalkTriggerDependencies) {
+	const handlers = createTalkTriggerHandlers(deps);
+	pi.on("agent_start", () => { handlers.agentStart(); });
+	return {
+		registerSessionHooks() {
+			pi.on("session_shutdown", () => handlers.sessionShutdown());
+			pi.on("before_agent_start", (event) => handlers.beforeAgentStart(event));
+		},
+	};
+}
+
+export function createTalkTriggerHandlers(deps: TalkTriggerDependencies) {
+	return {
+		agentStart() { deps.resetPermit(); },
+		async sessionShutdown() {
+			deps.resetPermit();
+			await deps.stop();
+		},
+		async beforeAgentStart(event: { systemPrompt: string }) {
+			if (!deps.isActive()) return;
+			const appendix = deps.appendix();
+			if (!appendix) return;
+			return { systemPrompt: `${event.systemPrompt}\n\n${appendix}` };
+		},
+	};
+}

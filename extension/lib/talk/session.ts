@@ -1427,7 +1427,8 @@ ${runtime.file ? `Latest file: ${runtime.file}` : ""}
 ### Tools
 - \`talk_list_styles\` — list evolutionary interaction styles
 - \`talk_set_style\` — switch style mid-conversation (e.g. chat → html-interactive → draw)
-- \`talk_render\` — render content in the current (or chosen) style; supports multi-surface (surface param), incremental DOM patches (patch param) and auto visual self-check (verify param)
+- \`talk_prepare_report\` — only after every task requirement and acceptance check is complete, provide completion evidence and no remaining work; asks the user which report type they want and grants a one-use reportPermit
+- \`talk_render\` — render content in the current (or chosen) style; report-governed HTML requires a fresh reportPermit for each report (including patches). Supports multi-surface (surface param) and auto visual self-check (verify param)
 - \`talk_poll_events\` — read user interaction events from interactive HTML (buttons, talkSend, forms, inputs)
 - \`talk_verify\` — visual self-check: headless screenshot + console errors + DOM info for the current surface
 - \`talk_export\` — export current surface as html/md/png/pdf
@@ -1440,7 +1441,7 @@ ${runtime.file ? `Latest file: ${runtime.file}` : ""}
 - \`/talk surfaces\` — list surfaces; \`/talk open [surface]\` — open a surface
 
 ### Incremental updates
-- **Patch**: \`talk_render({ content: \"\", patch: { selector: \"#id\", html: \"<p>…</p>\", method: \"inner|outer|append|prepend|remove\" } })\` updates only a subtree — no reload, scroll/focus preserved. Patches on persistent selectors write a durable version snapshot.
+- **Patch**: \`talk_render({ content: \"\", patch: { selector: \"#id\", html: \"<p>…</p>\", method: \"inner|outer|append|prepend|remove\" } })\` updates only a subtree — no reload, scroll/focus preserved. Report-governed patches also require a fresh \`reportPermit\`. Patches on persistent selectors write a durable version snapshot.
 - **Forms**: any form with \`data-talk-form\` is serialized (values) and sent via talkSend on submit; elements with \`data-talk-input\` send debounced input events.
 - **Surfaces**: render to a named surface with \`surface: \"id\"\`; each surface keeps its own document + version history; \`/s/<id>\` serves it at a stable URL.
 
@@ -1455,7 +1456,7 @@ ${runtime.file ? `Latest file: ${runtime.file}` : ""}
 - **chat**: put the full reply text in talk_render content; keep it readable. Also answer briefly in the main chat.
 - **html-static**: pass an HTML fragment or full document. No JS bridge.
 - **html-interactive**: ONLY for light clickable prototypes / choice UIs. Its default shell is plain white cards — NEVER use it for 汇报/结项/周报/阶段验收 pages (those look ugly). Prefer **report**.
-- **report**: the ONLY formal-report shell (derived from the supplied 智渔粮库 journal-style HTML). REQUIRED for 汇报/结项/周报/阶段说明/验收/评审/审计. content = body fragment using .hero/.sec-head/.kpi/.card/.tbl-wrap/.note/.tl/.verdict; no active content or one-off inline layout soup. Inspect result details.audit and fix errors/warnings. Cookbook: ~/.pi/agent/talk/styles/report/COOKBOOK.md
+- **report**: the ONLY formal-report shell for 汇报/结项/周报/阶段说明/验收/评审/审计. Never create HTML progress reports while work, external decisions or verification remain. After full acceptance, call talk_prepare_report to ask the user for this report's type, then author accordingly and pass its reportPermit to talk_render. Do not bypass via html-static/html-interactive. Use .hero/.sec-head/.kpi/.card/.tbl-wrap/.note/.tl/.verdict and fix all audit issues. Cookbook: ~/.pi/agent/talk/styles/report/COOKBOOK.md
 - **arch**: architecture diagrams via local Archify (tt-a1i/archify ← Cocoon generator). content = Archify JSON IR (preferred), full HTML, or Mermaid. Types: architecture/workflow/sequence/dataflow/lifecycle. Cookbook: ~/.pi/agent/talk/styles/arch/COOKBOOK.md
 - **draw**: content is newline-separated draw.sh ops (ensure, rect, text, arrow, snapshot, clear). Prefer small labeled sketches.
 - If the active style is wrong for the content, call talk_set_style then re-render; do not keep piling content into the wrong shell.

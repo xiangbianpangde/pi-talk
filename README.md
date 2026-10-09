@@ -25,7 +25,8 @@
 ### Key Features
 
 1. **Evolutionary Style System (12+ Styles)**
-   - `report` (default): Journal-style formal report design system (paper palette, serif hierarchy, KPI, cards, evidence tables, timeline, verdict).
+   - `report` (default): Journal-style formal HTML report design system (paper palette, serif hierarchy, KPI, cards, evidence tables, timeline, verdict).
+   - `talk_report_images`: Governed one-page image reporting; after completion and acceptance, choose 1–5 pages and generate editable 1200×1600 SVG plus PNG. Contract: `extension/lib/talk/report-image/DESIGN_SYSTEM.md`.
    - `explain`: Dedicated pedagogical explanation design system (distraction-free 68ch single-column layout, 100% directly visible, zero forced details folding, analogy breakage guards, inline checks).
    - `arch`: Interactive architecture, dataflow, sequence, and system maps via Archify.
    - `compare`: Side-by-side LCS diff comparison with redline review loops and clean document export.
@@ -106,7 +107,9 @@
 
 | Tool | Purpose |
 |------|---------|
-| `talk_render` | Render HTML/JSON/Markdown content or incremental DOM patches |
+| `talk_prepare_report` | After all work and acceptance checks pass, ask for a report type and, for image reports, a 1–5 page count; grant a mode-specific one-use permit |
+| `talk_render` | Render HTML/JSON/Markdown or DOM patches; formal report HTML requires a fresh HTML-mode `reportPermit` |
+| `talk_report_images` | Generate the chosen number of SVG + PNG infographics with provenance and limitations using an image-mode permit |
 | `talk_explain` | Validate and compile an `explain.ir/v1` plan into the dedicated `explain` design system |
 | `talk_poll_events` | Poll user interaction events (button clicks, form submits, inputs) |
 | `talk_verify` | Headless visual screenshot + console error verification |
@@ -127,7 +130,7 @@ node extension/lib/talk/tests/run-tests.mjs
 /talk test
 ```
 
-All 65 tests passing (41 talk & explain core tests + 9 explain design system tests + 9 report design system tests + 6 showcase tests).
+The regression suite covers report completion/type selection, the talk engine, and style packs. Run the command above for the current count.
 
 ---
 
@@ -152,7 +155,8 @@ All 65 tests passing (41 talk & explain core tests + 9 explain design system tes
 ### 核心特性
 
 1. **演进式样式系统（12+ 款样式）**
-   - `report`（默认基础样式）：期刊式正式汇报报告系统（温暖纸张色调、衬线字体层级、KPI 统计、卡片、证据表格、时间线、结论框）。
+   - `report`（默认基础样式）：期刊式正式 HTML 汇报报告系统（温暖纸张色调、衬线字体层级、KPI 统计、卡片、证据表格、时间线、结论框）。
+   - `talk_report_images`：正式「一张图汇报」模式；完成任务并验收后，选择 1–5 张，生成 SVG + PNG。
    - `explain`：专属概念精解设计系统（68ch 单栏沉浸阅读、100% 平铺直陈、零强制折叠、直觉类比破壁、代码走读与内嵌自测）。
    - `arch`：交互式架构图、时序图、数据流图与系统生命周期图（基于 Archify）。
    - `compare`：多版本并排 diff（真实 LCS 算法）：增删改高亮、统计徽章、逐项采纳与红线审阅导出。
@@ -233,7 +237,9 @@ All 65 tests passing (41 talk & explain core tests + 9 explain design system tes
 
 | 工具 | 作用 |
 |------|------|
-| `talk_render` | 渲染内容到活动表面，支持多表面路由与局部 DOM 补丁更新 |
+| `talk_prepare_report` | 完成并验收后询问类型；图像汇报再问 1–5 张，并发放模式专用许可 |
+| `talk_render` | 渲染内容到活动表面；正式 HTML 汇报需要 HTML 许可 `reportPermit` |
+| `talk_report_images` | 凭图像许可生成指定张数的 SVG + PNG，附来源和局限 |
 | `talk_explain` | 校验并将 `explain.ir/v1` 蓝图编译并渲染至专属 `explain` 设计系统 |
 | `talk_poll_events` | 轮询用户的交互事件（按钮点击、表单提交、输入） |
 | `talk_verify` | 无头浏览器截屏自检与控制台错误排查 |
@@ -254,7 +260,7 @@ node extension/lib/talk/tests/run-tests.mjs
 /talk test
 ```
 
-全套 65 项测试全部通过（41 项内核与解释层测试 + 9 项 explain 设计系统测试 + 9 项 report 设计系统测试 + 6 项 showcase 测试）。
+回归测试覆盖任务完成/汇报类型闸门、交互引擎及样式包；当前数量以执行结果为准。
 
 ---
 

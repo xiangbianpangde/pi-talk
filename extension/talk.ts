@@ -25,6 +25,7 @@ import {
 	pollEvents,
 	reloadStyles,
 	renderTalk,
+	governedAsReport,
 	resumeSession,
 	recoverOrphanRuntimeFile,
 	runCommand,
@@ -36,8 +37,11 @@ import { verifySurface } from "./lib/talk/verify";
 import { exportSurface } from "./lib/talk/export";
 import { formatExplainIssues, parseExplanationPlan } from "./lib/talk/explain/validate";
 import { compileExplanation } from "./lib/talk/explain/render";
+import { createReportGate } from "./lib/talk/report-gate";
+import { exportImageReport } from "./lib/talk/report-image/export";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
+import { registerTalkLifecycle, parseTalkArgs, resolveTalkStart } from "./lib/talk/trigger";
 
 function updateWidget(ctx: { ui: { setWidget: Function; setStatus: Function } }, runtime = getRuntime()): void {
 	if (!runtime.active) {
@@ -60,14 +64,6 @@ function updateWidget(ctx: { ui: { setWidget: Function; setStatus: Function } },
 	ctx.ui.setStatus("talk", `talk:${runtime.styleId}`);
 }
 
-function parseArgs(args: string): { sub?: string; rest: string } {
-	const trimmed = args.trim();
-	if (!trimmed) return { rest: "" };
-	const sp = trimmed.indexOf(" ");
-	if (sp < 0) return { sub: trimmed.toLowerCase(), rest: "" };
-	return { sub: trimmed.slice(0, sp).toLowerCase(), rest: trimmed.slice(sp + 1).trim() };
-}
-
 async function pickStyle(ctx: { ui: { select: Function } }, runtime = getRuntime()): Promise<string | undefined> {
 	const options = stylePickerOptions(runtime.styles);
 	if (options.length === 0) return undefined;
@@ -77,32 +73,27 @@ async function pickStyle(ctx: { ui: { select: Function } }, runtime = getRuntime
 
 export default function (pi: ExtensionAPI) {
 	const runtime = getRuntime();
+	const reportGate = createReportGate();
+	const triggers = registerTalkLifecycle(pi, {
+		resetPermit: () => reportGate.reset(),
+		stop: async () => { await stopSession(getRuntime()); },
+		isActive: () => getRuntime().active,
+		appendix: () => buildTalkSystemAppendix(getRuntime()),
+	});
 	// Fresh style scan on load/reload
 	reloadStyles(runtime);
 	// Crash recovery: reconcile a stale runtime.json left by a dead process
 	// (stamps the orphan session with endedAt, deactivates the file).
 	void recoverOrphanRuntimeFile();
 
-	pi.on("session_shutdown", async () => {
-		await stopSession(getRuntime());
-	});
-
-	pi.on("before_agent_start", async (event) => {
-		const rt = getRuntime();
-		if (!rt.active) return;
-		const appendix = buildTalkSystemAppendix(rt);
-		if (!appendix) return;
-		return {
-			systemPrompt: `${event.systemPrompt}\n\n${appendix}`,
-		};
-	});
+	triggers.registerSessionHooks();
 
 	pi.registerCommand("talk", {
 		description:
 			"Multimodal talk mode — formal reports use the reference-derived report design system by default; arch/draw and explicit prototype HTML remain available.",
 		handler: async (args, ctx) => {
 			const rt = getRuntime();
-			const { sub, rest } = parseArgs(args);
+			const { sub, rest } = parseTalkArgs(args);
 
 			// Subcommands that work without an active session
 			if (sub === "styles" || sub === "list") {
@@ -264,10 +255,8 @@ export default function (pi: ExtensionAPI) {
 					else setStyle(id, rt);
 					// If switching to html*, ensure server placeholder
 					const style = getStyleById(rt.styles, rt.styleId);
-					if (style && (style.kind === "html" || style.kind === "html-js")) {
-						const switchContent = style.id === "report"
-							? `<section id="report-welcome" class="hero" data-nav-title="就绪"><h1>正式汇报模式已就绪</h1><p class="sub">后续汇报将使用统一的期刊式设计系统。</p></section><section id="report-next" class="sec-head" data-nav-title="下一步"><h2>等待汇报内容</h2><p>提交目标、证据与结论后生成正式报告。</p></section><div class="verdict"><div class="lbl">状态</div><h3>REPORT READY</h3><p>已启用内容治理、响应式、打印与可访问性契约。</p></div>`
-							: `<p>Switched to <strong>${style.name}</strong>.</p>`;
+					if (style && (style.kind === "html" || style.kind === "html-js") && !governedAsReport(style)) {
+						const switchContent = `<p>Switched to <strong>${style.name}</strong>.</p>`;
 						await renderTalk(
 							{
 								styleId: style.id,
@@ -315,25 +304,11 @@ export default function (pi: ExtensionAPI) {
 			//   /talk html-interactive
 			//   /talk html-interactive explain this
 			//   /talk explain this architecture   (message only → picker)
-			let styleId: string | undefined;
-			let message = "";
-
-			if (sub && getStyleById(rt.styles, sub)) {
-				styleId = sub;
-				message = rest;
-			} else if (sub) {
-				// treat entire args as message
-				message = args.trim();
-			}
-
-			if (!styleId) {
-				// Base style = the reference-derived report design system. Picker only for bare /talk in TUI.
-				if (ctx.mode === "tui" && !message) {
-					styleId = (await pickStyle(ctx, rt)) || getDefaultStyleId(rt.styles);
-				} else {
-					styleId = getDefaultStyleId(rt.styles);
-				}
-			}
+			const { styleId, message } = await resolveTalkStart(args, ctx.mode, {
+				hasStyle: (id) => Boolean(getStyleById(rt.styles, id)),
+				defaultStyle: () => getDefaultStyleId(rt.styles),
+				pickStyle: () => pickStyle(ctx, rt),
+			});
 			if (!styleId) {
 				ctx.ui.notify("Cancelled", "info");
 				return;
@@ -420,14 +395,71 @@ export default function (pi: ExtensionAPI) {
 	});
 
 	pi.registerTool({
+		name: "talk_prepare_report",
+		label: "Prepare formal report",
+		description: "Only after the entire task is complete and acceptance checks pass, ask the user which report type they want; image reports also ask for 1–5 pages. Returns a mode-specific one-use permit for talk_render or talk_report_images. Never use for progress updates or unresolved blockers.",
+		parameters: Type.Object({
+			summary: Type.String({ description: "What was fully completed (not a plan or partial result)" }),
+			checks: Type.Array(Type.String(), { description: "Actual acceptance/verification checks that passed" }),
+			remainingWork: Type.Array(Type.String(), { description: "Every unresolved requirement, blocker or pending check; must be empty" }),
+		}),
+		async execute(_id, params, _signal, _onUpdate, ctx) {
+			if (!ctx.hasUI) {
+				return { content: [{ type: "text", text: "No interactive UI to ask for a report type; no formal report authorized." }], details: { ok: false } };
+			}
+			const result = await reportGate.prepare(params, (question, options) => ctx.ui.select(question, options));
+			return {
+				content: [{ type: "text", text: result.ok
+					? result.choice === "一张图汇报"
+						? `User selected ${result.imageCount} image(s). Author exactly ${result.imageCount} infographic page(s), then call talk_report_images(reportPermit=${result.id}). Each page requires source and caveat; do not invent metrics.`
+						: `User selected ${result.choice}. Author one ${result.choice} report, then call talk_render(styleId=report, reportPermit=${result.id}).`
+					: result.message }],
+				details: result,
+			};
+		},
+	});
+
+	pi.registerTool({
+		name: "talk_report_images",
+		label: "One-page image report",
+		description: "Create the selected 1–5 page formal image report. Compiles structured evidence into a 1200×1600 SVG editorial infographic and converts each to PNG. Requires an image-mode permit from talk_prepare_report after completion and acceptance.",
+		parameters: Type.Object({
+			reportPermit: Type.String(),
+			pages: Type.Array(Type.Object({
+				kicker: Type.String({ description: "Topic / issue label" }),
+				title: Type.String({ description: "Short report headline" }),
+				takeaway: Type.String({ description: "One defensible conclusion" }),
+				metrics: Type.Optional(Type.Array(Type.Object({ value: Type.String(), label: Type.String() }), { maxItems: 3, description: "Only verified numerical signals; omit rather than invent" })),
+				insights: Type.Array(Type.Object({ title: Type.String(), body: Type.String() }), { minItems: 2, maxItems: 4 }),
+				evidence: Type.Array(Type.String(), { minItems: 1, maxItems: 3, description: "Traceable checks or findings" }),
+				caveat: Type.String({ description: "Boundary or limitation, never omit" }),
+				source: Type.String({ description: "Specific file, run, URL, or evidence provenance" }),
+			}), { minItems: 1, maxItems: 5 }),
+		}),
+		async execute(_id, params) {
+			const count = reportGate.imageCount(params.reportPermit);
+			if (!count) return { content: [{ type: "text", text: "Image report blocked: obtain an image-mode permit from talk_prepare_report." }], details: { ok: false, reason: "image-permit-required" } };
+			if (params.pages.length !== count) return { content: [{ type: "text", text: `Expected exactly ${count} image(s), received ${params.pages.length}; permit remains usable.` }], details: { ok: false, reason: "image-count-mismatch" } };
+			try {
+				const artifacts = await exportImageReport(params.pages, getRuntime().sessionId);
+				reportGate.consume(params.reportPermit, "image");
+				return { content: [{ type: "text", text: `Image report exported (${artifacts.length} PNG + editable SVG):\n${artifacts.map((a, i) => `${i + 1}. ${a.png}\n   ${a.svg}`).join("\n")}` }], details: { ok: true, artifacts } };
+			} catch (error) {
+				return { content: [{ type: "text", text: `Image report failed: ${error instanceof Error ? error.message : String(error)}. Permit remains usable; revise content or conversion environment and retry.` }], details: { ok: false } };
+			}
+		},
+	});
+
+	pi.registerTool({
 		name: "talk_render",
 		label: "Talk render",
 		description:
 			"Render into the active /talk surface. Formal reports use styleId=report and the governed .hero/.sec-head/.kpi/.card/.tbl-wrap/.verdict design system; result details include a report audit. arch=JSON IR; draw=draw.sh lines; chat=text.",
 		promptSnippet: "Render formal reports, reviews, milestones, weekly updates, and acceptance summaries in the /talk report design system",
 		promptGuidelines: [
-			"Use talk_render with styleId report for 汇报、结项、周报、阶段说明、验收、评审、审计和方案总结; do not build those pages in raw html-static or html-interactive.",
+			"Use talk_render with styleId report for formal HTML 汇报、结项、周报、阶段说明、验收、评审、审计和方案总结. For 一张图汇报 use talk_report_images; do not build either in raw html-static or html-interactive.",
 			"When using talk_render styleId report, author a body fragment with .hero, section[id].sec-head, semantic KPI/card/table/note components, and a final .verdict; avoid one-off inline style layouts.",
+			"For formal HTML or image reports, finish the entire task and all acceptance checks first. Call talk_prepare_report with completion evidence and zero remaining work. Use its mode-specific permit with talk_render for HTML or talk_report_images for the user-selected 1–5 image pages. Do not publish progress reports or bypass the gate.",
 			"After talk_render returns a report audit, fix every error and warning (delivery target: 0/0) before presenting the report; use arbitrary JavaScript only in explicit html-interactive prototype tasks.",
 		],
 		parameters: Type.Object({
@@ -436,6 +468,7 @@ export default function (pi: ExtensionAPI) {
 					"Payload for the style. HTML fragment/document for html*; draw.sh lines for draw; markdown/text for chat. Empty when patching.",
 			}),
 			styleId: Type.Optional(Type.String({ description: "Override style for this render" })),
+			reportPermit: Type.Optional(Type.String({ description: "One-use authorization from talk_prepare_report, required for report-governed HTML" })),
 			title: Type.Optional(Type.String({ description: "Surface title" })),
 			open: Type.Optional(Type.Boolean({ description: "Open/focus browser surface after render" })),
 			metaJson: Type.Optional(
@@ -461,6 +494,10 @@ export default function (pi: ExtensionAPI) {
 		}),
 		async execute(_id, params) {
 			const rt = getRuntime();
+			const style = getStyleById(rt.styles, params.styleId || rt.styleId);
+			if (governedAsReport(style) && !reportGate.allowed(params.reportPermit, "html")) {
+				return { content: [{ type: "text", text: "Formal report blocked: finish all work, pass acceptance checks, then call talk_prepare_report to ask the user for this report's type." }], details: { ok: false, reason: "report-permit-required" } };
+			}
 			let meta: Record<string, unknown> | undefined;
 			if (params.metaJson) {
 				try {
@@ -485,6 +522,10 @@ export default function (pi: ExtensionAPI) {
 				},
 				rt,
 			);
+			const audit = result.details?.audit as { warnings?: unknown[] } | undefined;
+			if (governedAsReport(style) && result.ok && (!audit?.warnings || audit.warnings.length === 0)) {
+				reportGate.consume(params.reportPermit, "html");
+			}
 			return {
 				content: [
 					{

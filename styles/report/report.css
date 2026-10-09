@@ -410,7 +410,7 @@
   }
   .hero::before{content:"";position:absolute;right:-40px;top:-40px;width:280px;height:280px;background:radial-gradient(circle, rgba(139,58,31,.10), transparent 70%);pointer-events:none}
   .hero::after{content:"";position:absolute;left:-60px;bottom:-60px;width:240px;height:240px;background:radial-gradient(circle, rgba(47,80,97,.08), transparent 70%);pointer-events:none}
-  .hero .tag-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+  .hero .tag-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:12px}
   .hero h1{font-family:var(--serif);font-size:38px;font-weight:700;letter-spacing:-1.2px;line-height:1.15;margin:6px 0 10px;color:var(--txt)}
   .hero .sub{font-family:var(--serif);font-size:16px;color:var(--txt-dim);max-width:740px;line-height:1.5;margin-bottom:18px}
   .hero .meta-row{display:flex;gap:18px;flex-wrap:wrap;font-family:var(--mono);font-size:11px;color:var(--txt-faint);letter-spacing:.5px}
@@ -500,7 +500,7 @@
   .tip:hover .tipbox,.tip:focus-within .tipbox{opacity:1;transform:translateX(-50%) scale(1)}
 
   /* —— 步骤模拟器 —— */
-  .sim{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px;box-shadow:var(--shadow);margin:14px 0}
+  .sim:not(.sample-pill){background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px;box-shadow:var(--shadow);margin:14px 0}
   .sim h4{margin:0 0 8px;font-family:var(--serif);font-size:14.5px;display:flex;align-items:center;gap:8px}
   .sim h4 .ind{width:8px;height:8px;border-radius:50%;background:var(--good);box-shadow:0 0 0 3px rgba(63,107,61,.2);animation:pulse 1.6s ease-in-out infinite}
   @keyframes pulse{0%,100%{box-shadow:0 0 0 3px rgba(63,107,61,.2)}50%{box-shadow:0 0 0 6px rgba(63,107,61,.05)}}

@@ -5,6 +5,12 @@
 import { startTalkServer, injectBridge, getBridgeVersion, applyPatchToHtml, compileCompoundSelector, BRIDGE_SOURCE } from "../server";
 import { loadStyleRegistry, parseManifest, validateManifest, getStyleById } from "../registry";
 import { auditReportContent } from "../report-audit";
+import { createReportGate, REPORT_CHOICES } from "../report-gate";
+import { renderImageReportSvg } from "../report-image/render";
+import { exportImageReport } from "../report-image/export";
+import { getSessionDir } from "../paths";
+import { randomUUID } from "node:crypto";
+import { createTalkTriggerHandlers, parseTalkArgs, resolveTalkStart, registerTalkLifecycle } from "../trigger";
 import { auditExplainContent } from "../explain-audit";
 import { parseExplanationPlan, validateExplanationPlan } from "../explain/validate";
 import { compileExplanation, plainText, renderMarkdownLite, thesisOf } from "../explain/render";
@@ -24,7 +30,7 @@ import {
 	deleteSession,
 	escapeJsonScriptPayload,
 } from "../session";
-import { existsSync, readFileSync, mkdtempSync, mkdirSync, writeFileSync, readdirSync, utimesSync } from "node:fs";
+import { existsSync, readFileSync, mkdtempSync, mkdirSync, writeFileSync, readdirSync, utimesSync, rmSync } from "node:fs";
 import { tmpdir, homedir } from "node:os";
 import { request as httpRequest } from "node:http";
 import { join } from "node:path";
@@ -40,6 +46,82 @@ function ok(cond: unknown, msg?: string): void {
 function eq<T>(a: T, b: T, msg?: string): void {
 	if (a !== b) throw new Error(`${msg || "eq"}: ${JSON.stringify(a)} !== ${JSON.stringify(b)}`);
 }
+
+test("isolation: session writes stay inside the disposable test home", () => {
+	const expected = process.env.TALK_TEST_HOME;
+	ok(expected, "tests must run through the isolated runner");
+	eq(homedir(), expected!);
+	ok(getSessionDir("isolation-probe").startsWith(join(expected!, ".pi", "agent", "talk", "sessions")));
+});
+
+test("trigger: argument parsing preserves legacy whitespace and case", () => {
+	for (const [input, expected] of [
+		["", { rest: "" }], ["  ", { rest: "" }],
+		[" REPORT ", { sub: "report", rest: "" }],
+		["HTML-STATIC  Explain This", { sub: "html-static", rest: "Explain This" }],
+		["style\treport", { sub: "style\treport", rest: "" }],
+	] as const) eq(JSON.stringify(parseTalkArgs(input)), JSON.stringify(expected));
+});
+
+test("trigger: start routing preserves explicit styles, non-TUI and cancelled picker fallback", async () => {
+	for (const [args, mode, choice, expectedStyle, expectedMessage, picks] of [
+		["", "tui", "chat", "chat", "", 1],
+		["", "tui", undefined, "report", "", 1],
+		["", "rpc", "chat", "report", "", 0],
+		[" Explain This ", "tui", "chat", "report", "Explain This", 0],
+		[" CHAT Hello World", "tui", "report", "chat", "Hello World", 0],
+	] as const) {
+		let pickCount = 0;
+		const actual = await resolveTalkStart(args, mode, {
+			hasStyle: (id) => id === "chat" || id === "report",
+			defaultStyle: () => "report",
+			pickStyle: async () => { pickCount++; return choice; },
+		});
+		eq(actual.styleId, expectedStyle);
+		eq(actual.message, expectedMessage);
+		eq(pickCount, picks);
+	}
+	const noStyle = await resolveTalkStart("", "tui", {
+		hasStyle: () => false, defaultStyle: () => undefined, pickStyle: async () => undefined,
+	});
+	eq(noStyle.styleId, undefined);
+});
+
+test("trigger: lifecycle registration preserves event names and ordering", async () => {
+	const hooks = new Map<string, (...args: any[]) => any>();
+	const calls: string[] = [];
+	const lifecycle = registerTalkLifecycle({ on: (event, handler) => { hooks.set(event, handler); } }, {
+		resetPermit: () => calls.push("reset"), stop: async () => { calls.push("stop"); },
+		isActive: () => false, appendix: () => "",
+	});
+	lifecycle.registerSessionHooks();
+	eq([...hooks.keys()].join(","), "agent_start,session_shutdown,before_agent_start");
+	await hooks.get("agent_start")!({});
+	await hooks.get("session_shutdown")!({});
+	eq(calls.join(","), "reset,reset,stop");
+});
+
+test("trigger: lifecycle resets permit, stops in order and only appends while active", async () => {
+	const calls: string[] = [];
+	let active = false;
+	let appendix = "context";
+	const handlers = createTalkTriggerHandlers({
+		resetPermit: () => { calls.push("reset"); },
+		stop: async () => { calls.push("stop"); },
+		isActive: () => active,
+		appendix: () => { calls.push("appendix"); return appendix; },
+	});
+	eq(await handlers.beforeAgentStart({ systemPrompt: "base" }), undefined);
+	eq(calls.length, 0);
+	active = true;
+	eq((await handlers.beforeAgentStart({ systemPrompt: "base" }))?.systemPrompt, "base\n\ncontext");
+	appendix = "";
+	eq(await handlers.beforeAgentStart({ systemPrompt: "base" }), undefined);
+	calls.length = 0;
+	handlers.agentStart();
+	await handlers.sessionShutdown();
+	eq(calls.join(","), "reset,reset,stop");
+});
 
 // ---------- 1. registry ----------
 test("registry: styles discovered, report default", () => {
@@ -82,6 +164,139 @@ test("audit: onclick rejected", () => {
 test("audit: shell elements rejected", () => {
 	const a = auditReportContent("<html><body><p>x</p></body></html>");
 	ok(a.errors.some((e) => e.code === "shell-escape"), "shell flagged");
+});
+
+test("report gate: incomplete or unverified work never prompts", async () => {
+	const gate = createReportGate();
+	let prompts = 0;
+	const select = async () => { prompts++; return REPORT_CHOICES[0]; };
+	for (const completion of [
+		{ summary: "partial", checks: ["a"], remainingWork: ["external pin"] },
+		{ summary: "done", checks: [], remainingWork: [] },
+		{ summary: " ", checks: ["a"], remainingWork: [] },
+	]) eq((await gate.prepare(completion, select)).ok, false);
+	eq(prompts, 0);
+	ok(!gate.allowed(undefined));
+});
+test("report gate: user choice is one-shot, cancellation and new tasks reset", async () => {
+	const gate = createReportGate();
+	const done = { summary: "done", checks: ["acceptance passed"], remainingWork: [] };
+	const cancelled = await gate.prepare(done, async () => "取消汇报");
+	eq(cancelled.ok, false);
+	ok(!gate.allowed(undefined));
+	const prepared = await gate.prepare(done, async () => REPORT_CHOICES[2]);
+	ok(prepared.ok);
+	if (!prepared.ok) return;
+	eq(prepared.choice, "技术验收");
+	ok(gate.allowed(prepared.id));
+	ok(!gate.allowed("incorrect"));
+	ok(!gate.consume("incorrect"));
+	ok(gate.consume(prepared.id));
+	ok(!gate.consume(prepared.id));
+	const next = await gate.prepare(done, async () => REPORT_CHOICES[0]);
+	ok(next.ok);
+	gate.reset();
+	if (next.ok) ok(!gate.allowed(next.id));
+});
+
+test("image gate: asks 1–5 count and enforces mode, cancellation and exact permit", async () => {
+	const gate = createReportGate();
+	const done = { summary: "done", checks: ["passed"], remainingWork: [] };
+	const prompts: string[] = [];
+	const prepared = await gate.prepare(done, async (question) => {
+		prompts.push(question);
+		return prompts.length === 1 ? "一张图汇报" : "3 张";
+	});
+	ok(prepared.ok);
+	if (!prepared.ok) return;
+	eq(prompts.length, 2);
+	eq(prepared.imageCount, 3);
+	eq(gate.imageCount(prepared.id), 3);
+	ok(!gate.allowed(prepared.id, "html"));
+	ok(!gate.consume(prepared.id, "html"));
+	ok(gate.consume(prepared.id, "image"));
+	ok(!gate.allowed(prepared.id, "image"));
+	const cancelled = await gate.prepare(done, async (question) => question.includes("几张") ? "取消汇报" : "一张图汇报");
+	ok(!cancelled.ok);
+	ok(!gate.allowed(prepared.id));
+	for (let n = 1; n <= 5; n++) {
+		const selected = await gate.prepare(done, async (question) => question.includes("几张") ? `${n} 张` : "一张图汇报");
+		ok(selected.ok);
+		if (selected.ok) eq(gate.imageCount(selected.id), n);
+	}
+	const invalid = await gate.prepare(done, async (question) => question.includes("几张") ? "6 张" : "一张图汇报");
+	ok(!invalid.ok);
+	ok(!gate.allowed(undefined));
+	const html = await gate.prepare(done, async () => "简要汇报");
+	ok(html.ok);
+	if (html.ok) { ok(gate.allowed(html.id, "html")); ok(!gate.allowed(html.id, "image")); }
+});
+
+const imagePage = {
+	kicker: "研发里程碑", title: "交付质量与关键证据", takeaway: "已通过核心验收；在限定环境下可投入使用。",
+	metrics: [{ value: "37/37", label: "验收用例通过" }],
+	insights: [{ title: "覆盖主流程", body: "全部关键路径完成自动化校验。" }, { title: "剩余风险", body: "跨平台字体需要人工复核。" }],
+	evidence: ["tests/run-tests.mjs 通过", "本地真实 PNG 文件头已核验"],
+	caveat: "仅在现有测试环境验证，未覆盖生产流量。", source: "本地自动化验收 / 2026-01",
+};
+test("image report: valid SVG is escaped, sized and traceable", () => {
+	const svg = renderImageReportSvg({ ...imagePage, title: "<验收>&复盘" }, 1, 2);
+	ok(svg.includes('width="1200" height="1600"'));
+	ok(svg.includes("&lt;验收&gt;&amp;复盘"));
+	ok(svg.includes("本地自动化验收"));
+	ok(svg.includes("02") && svg.includes("01"));
+	ok(!svg.includes("<验收>"));
+});
+test("image report: missing provenance, overflow and arbitrary keys fail closed", () => {
+	for (const bad of [
+		{ ...imagePage, source: "" },
+		{ ...imagePage, takeaway: "这是过长的结论".repeat(15) },
+		{ ...imagePage, code: "<script/>" },
+		{ ...imagePage, title: "坏字符\uD800" },
+		{ ...imagePage, source: "path\u202Egnp" },
+		{ ...imagePage, insights: [] },
+	]) {
+		let failed = false;
+		try { renderImageReportSvg(bad); } catch { failed = true; }
+		ok(failed);
+	}
+	let overflow = false;
+	try { renderImageReportSvg({ ...imagePage, metrics: Array.from({ length: 3 }, () => ({ value: "很长的指标数值文本编号", label: "验证结果" })) }); } catch { overflow = true; }
+	ok(overflow, "three-column metric must fit its column");
+});
+test("image export: count validation and failed conversion roll back whole batch", async () => {
+	const id = randomUUID();
+	const root = getSessionDir(id);
+	const prior = process.env.CHROME_PATH;
+	try {
+		for (const pages of [[], Array(6).fill(imagePage)]) {
+			let failed = false;
+			try { await exportImageReport(pages, id); } catch { failed = true; }
+			ok(failed);
+		}
+		process.env.CHROME_PATH = "/usr/bin/false";
+		let failed = false;
+		try { await exportImageReport([imagePage, imagePage], id); } catch { failed = true; }
+		ok(failed);
+		ok(!existsSync(join(root, "exports")) || readdirSync(join(root, "exports")).length === 0, "failed batch left artifacts");
+	} finally {
+		if (prior === undefined) delete process.env.CHROME_PATH; else process.env.CHROME_PATH = prior;
+		rmSync(root, { recursive: true, force: true });
+	}
+});
+test("image export: real PNG is 1200×1600 and retains SVG", async () => {
+	if (!resolveChrome()) return;
+	const id = randomUUID();
+	try {
+		const artifacts = await exportImageReport([imagePage], id);
+		eq(artifacts.length, 1);
+		const a = artifacts[0];
+		ok(existsSync(a.svg) && existsSync(a.png));
+		const png = readFileSync(a.png);
+		eq(png.subarray(0, 8).toString("hex"), "89504e470d0a1a0a");
+		eq(png.readUInt32BE(16), 1200);
+		eq(png.readUInt32BE(20), 1600);
+	} finally { rmSync(getSessionDir(id), { recursive: true, force: true }); }
 });
 
 // ---------- 3. lint (light audit for non-report styles) ----------

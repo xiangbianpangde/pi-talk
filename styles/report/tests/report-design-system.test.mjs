@@ -85,6 +85,9 @@ describe('report design system sources', () => {
     assert.match(css, /\.boundary-box\{/);
     assert.match(css, /\.formula-wrap\{/);
     assert.match(css, /\.sample-pill\{/);
+    assert.match(css, /\.sim:not\(\.sample-pill\)\{/);
+    assert.doesNotMatch(css, /\s\.sim\{/);
+    assert.match(css, /\.hero \.tag-row\{[^}]*align-items:center/);
     assert.match(css, /\.ablation-table/);
   });
 

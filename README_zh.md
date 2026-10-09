@@ -21,7 +21,8 @@
 ## 核心特性
 
 ### 1. 演进式样式系统（12+ 款样式）
-- `report`（默认基础样式）：期刊式正式汇报报告系统（温暖纸张色调、衬线字体层级、KPI 统计、卡片、证据表格、时间线、结论框）。
+- `report`（默认基础样式）：期刊式正式 HTML 汇报报告系统（温暖纸张色调、衬线字体层级、KPI 统计、卡片、证据表格、时间线、结论框）。
+- `talk_report_images`：正式「一张图汇报」模式；完成任务并验收后，先选择模式和 1–5 张，再以结构化内容生成 1200×1600 SVG 及 PNG。设计契约见 `extension/lib/talk/report-image/DESIGN_SYSTEM.md`。
 - `arch`：交互式架构图、时序图、数据流图与系统生命周期图（基于 Archify）。
 - `compare`：多版本并排 diff（真实 LCS 算法）：增删改高亮、统计徽章、逐项采纳与红线审阅导出。
 - `evalgrid`：用例 × 模型评测对照台：单元格展开、打分与 baseline 锁定。
@@ -100,7 +101,9 @@
 
 | 工具 | 作用 |
 |------|------|
-| `talk_render` | 渲染内容到活动表面，支持多表面路由与局部 DOM 补丁更新 |
+| `talk_prepare_report` | 任务全部完成且验收检查通过后，询问汇报类型；选一张图时再问 1–5 张并发放图像许可 |
+| `talk_render` | 渲染内容到活动表面；正式 HTML 汇报需要本次 HTML 许可 `reportPermit` |
+| `talk_report_images` | 以图像许可生成选定张数的 SVG + PNG；强制来源、局限与内容预算 |
 | `talk_explain` | 校验并将 `explain.ir/v1` 蓝图编译并渲染至专属 `explain` 设计系统 |
 | `talk_poll_events` | 轮询用户的交互事件（按钮点击、表单提交、输入） |
 | `talk_verify` | 无头浏览器截屏自检与控制台错误排查 |
@@ -121,7 +124,7 @@ node extension/lib/talk/tests/run-tests.mjs
 /talk test
 ```
 
-全套 65 项测试全部通过（41 项内核与解释层测试 + 9 项 explain 设计系统测试 + 9 项 report 设计系统测试 + 6 项 showcase 测试）。
+回归测试覆盖任务完成/汇报类型闸门、交互引擎及样式包；当前数量以执行结果为准。
 
 ---
 
