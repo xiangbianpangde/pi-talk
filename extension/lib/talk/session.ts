@@ -128,6 +128,7 @@ function sessionRecord(runtime: TalkRuntime): TalkSessionRecord {
 		versionCount: runtime.versionCount,
 		eventCount: runtime.server?.listEvents().length ?? 0,
 		surfaces: [...runtime.surfaces.keys()],
+		surfaceStyles: Object.fromEntries([...runtime.surfaces].map(([id, surface]) => [id, surface.styleId])),
 		activeSurface: runtime.activeSurface,
 	};
 }
@@ -305,6 +306,7 @@ export async function stopSession(runtime = getRuntime()): Promise<void> {
 			meta.renderCount = runtime.renderCount;
 			meta.versionCount = runtime.versionCount;
 			meta.surfaces = [...runtime.surfaces.keys()];
+			meta.surfaceStyles = Object.fromEntries([...runtime.surfaces].map(([id, surface]) => [id, surface.styleId]));
 			writeFileSync(metaPath, JSON.stringify(meta, null, 2));
 		} catch {
 			/* best-effort */
@@ -1355,17 +1357,19 @@ export async function resumeSession(
 					bySurface.set(surface, f);
 				}
 				for (const [surface, f] of bySurface) {
+					const restoredStyle = getStyleById(runtime.styles, meta.surfaceStyles?.[surface] || style.id);
+					if (!restoredStyle) throw new Error(`Persisted surface style unavailable: ${surface}`);
 					const html = readFileSync(join(versionDir, f), "utf8");
 					server.setDocument(
-						{ title: meta.title ?? "Talk", html, styleId: style.id, kind: style.kind },
+						{ title: meta.title ?? "Talk", html, styleId: restoredStyle.id, kind: restoredStyle.kind },
 						surface,
 					);
 					const prev = runtime.surfaces.get(surface);
 					runtime.surfaces.set(surface, {
 						id: surface,
 						title: meta.title ?? "Talk",
-						styleId: style.id,
-						kind: style.kind,
+						styleId: restoredStyle.id,
+						kind: restoredStyle.kind,
 						file: join(versionDir, f),
 						updatedAt: Date.now(),
 						versionCount: (prev?.versionCount ?? 0) + 1,

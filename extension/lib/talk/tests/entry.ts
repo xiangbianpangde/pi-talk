@@ -569,6 +569,19 @@ test("session: input.surface param targets named surface", async () => {
 	ok(rt.server?.getState("named") !== undefined, "named surface stored");
 	await stopSession(rt);
 });
+test("session: mixed surface styles retain target governance across resume", async () => {
+	const rt = getRuntime();
+	await startSession("html-interactive", {}, rt);
+	const id = rt.sessionId!;
+	await renderTalk({ content: "<p>report identity</p>", surface: "main" }, rt);
+	rt.surfaces.get("main")!.styleId = "report";
+	await stopSession(rt);
+	await resumeSession(id, {}, rt);
+	eq(rt.surfaces.get("main")!.styleId, "report");
+	eq(resolvePatchTarget({ content: "", patch: { selector: "p" } }, rt)?.style?.id, "report");
+	await stopSession(rt);
+});
+
 test("session: listSessions + resume restores document", async () => {
 	const rt = getRuntime();
 	await startSession("html-interactive", { title: "resume-test" }, rt);

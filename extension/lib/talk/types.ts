@@ -118,6 +118,8 @@ export interface TalkSessionRecord {
 	versionCount: number;
 	eventCount: number;
 	surfaces: string[];
+	/** Trusted style identity for each persisted surface; legacy sessions lack it. */
+	surfaceStyles?: Record<string, string>;
 	activeSurface?: string;
 	endedAt?: number;
 }
