@@ -19,6 +19,12 @@ Patch governance now resolves the existing target surface before auditing or che
 
 Run isolated regression tests with `node extension/lib/talk/tests/run-tests.mjs`. For release verification use `TALK_REQUIRE_CHROME=1 node extension/lib/talk/tests/run-tests.mjs`; missing Chromium is a failure in release mode, otherwise browser-dependent cases explicitly report SKIP. The runner still depends on locally installed esbuild, parse5 and typebox; it is not yet a portable CI environment. Chromium can fail intermittently on macOS without a usable display context; a failed run is not automatically retried or reported as passing.
 
+### Authorized local-history replay (2026-10-09)
+
+`extension/lib/talk/tests/history-evaluation.ts` is an opt-in, read-only local history evaluator. It selects at most two tasks per session, excludes compacted/branched histories, and requires a user prompt, tool results and a final assistant reply. It emits counts and timings only, never raw task text, file paths or tool payloads. It is not part of normal regression tests and requires explicit permission to access history.
+
+A local run replayed **20 tasks from 14 sessions**, comprising **893 tool results and 69 execution failures**. All 20 rejected a fabricated completed state without historical requirement mappings; all 20 suppressed repeated automatic drafts and responded to explicit requests. All 20 had truncated/evicted context. Local deterministic collection/refinement p50 was **0.465 ms**, p95 **0.987 ms**, with **0 additional semantic model calls**. These timings exclude model synthesis and user interaction; they are not end-to-end latency improvements. Original reply sizes and historical model usage are measured by the evaluator, but no new model-produced reports were compared: **semantic accuracy, information value, reading burden, semantic deduplication and model Token savings remain unmeasured**. The replay is evidence for structural invariants only, not final acceptance or Trigger freezing. Raw histories and per-case local outputs are not committed.
+
 ### Overview
 
 `/talk` is an extension for the [Pi coding agent](https://github.com/earendil-works/pi-coding-agent) that provides rich multimodal interaction alongside the main transcript — journal-grade formal reports, interactive UIs, Archify architecture diagrams, whiteboard canvases, code diff comparisons, and a cognitive Explanation Layer.
