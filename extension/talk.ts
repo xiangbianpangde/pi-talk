@@ -430,7 +430,7 @@ export default function (pi: ExtensionAPI) {
 	pi.registerTool({
 		name: "talk_prepare_report",
 		label: "Prepare formal report",
-		description: "Only after the entire task is complete and acceptance checks pass, ask the user which report type they want; image reports also ask for 1–5 pages. Returns a mode-specific one-use permit for talk_render or talk_report_images. Never use for progress updates or unresolved blockers.",
+		description: "Explicit formal rich-media requests ONLY. After completion and acceptance, ask for the formal report subtype and optional image count. Returns a presentation permit, not independent fact verification. Never call for ordinary main-transcript reports or progress updates.",
 		parameters: Type.Object({
 			summary: Type.String({ description: "What was fully completed (not a plan or partial result)" }),
 			checks: Type.Array(Type.String(), { description: "Actual acceptance/verification checks that passed" }),

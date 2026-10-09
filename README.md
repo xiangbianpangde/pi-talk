@@ -115,7 +115,7 @@ Run isolated regression tests with `node extension/lib/talk/tests/run-tests.mjs`
 
 | Tool | Purpose |
 |------|---------|
-| `talk_prepare_report` | After all work and acceptance checks pass, ask for a report type and, for image reports, a 1–5 page count; grant a mode-specific one-use permit |
+| `talk_prepare_report` | Explicit formal rich-media requests only: authorize a subtype/count after acceptance; never required for ordinary text |
 | `talk_render` | Render HTML/JSON/Markdown or DOM patches; formal report HTML requires a fresh HTML-mode `reportPermit` |
 | `talk_report_images` | Generate the chosen number of SVG + PNG infographics with provenance and limitations using an image-mode permit |
 | `talk_explain` | Validate and compile an `explain.ir/v1` plan into the dedicated `explain` design system |

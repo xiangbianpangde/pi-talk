@@ -8,7 +8,7 @@ export function parseTalkArgs(args: string): { sub?: string; rest: string } {
 	return { sub: trimmed.slice(0, sp).toLowerCase(), rest: trimmed.slice(sp + 1).trim() };
 }
 
-/** Keep bare-TUI picker fallback and message-only defaults exactly as before. */
+/** Explicit style commands retain legacy picker fallback; ordinary /talk is routed by the command layer to the main transcript. */
 export async function resolveTalkStart(args: string, mode: string, deps: {
 	hasStyle(id: string): boolean;
 	defaultStyle(): string | undefined;
