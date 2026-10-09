@@ -109,6 +109,7 @@ test("trigger: lifecycle registration preserves event names and ordering", async
 		isActive: () => false, appendix: () => "",
 	});
 	lifecycle.registerSessionHooks();
+	lifecycle.registerSessionHooks();
 	eq([...hooks.keys()].join(","), "agent_start,session_shutdown,before_agent_start");
 	await hooks.get("agent_start")!({});
 	await hooks.get("session_shutdown")!({});

@@ -60,12 +60,16 @@ export interface TalkTriggerDependencies {
 
 export function registerTalkLifecycle(pi: Pick<ExtensionAPI, "on">, deps: TalkTriggerDependencies) {
 	const handlers = createTalkTriggerHandlers(deps);
-	pi.on("agent_start", () => { handlers.agentStart(); });
+	const dispose = [pi.on("agent_start", () => { handlers.agentStart(); })];
+	let registered = false;
 	return {
 		registerSessionHooks() {
-			pi.on("session_shutdown", () => handlers.sessionShutdown());
-			pi.on("before_agent_start", (event) => handlers.beforeAgentStart(event));
+			if (registered) return;
+			registered = true;
+			dispose.push(pi.on("session_shutdown", () => handlers.sessionShutdown()));
+			dispose.push(pi.on("before_agent_start", (event) => handlers.beforeAgentStart(event)));
 		},
+		dispose() { for (const off of dispose.splice(0)) off?.(); },
 	};
 }
 
