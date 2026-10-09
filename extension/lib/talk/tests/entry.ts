@@ -500,6 +500,8 @@ test("extension: actual tool registration enforces target permit and rejects cro
 	await hooks.get("tool_result")({ toolName: "bash", toolCallId: "observed", content: [{ type: "text", text: "passed" }], isError: false });
 	const context = await tools.get("talk_report_context").execute();
 	eq(context.details.goal, "verify feature");
+	eq(context.details.opportunity.cause, "explicit");
+	eq(context.details.opportunity.explicitFormat, "text");
 	eq(context.details.evidence.length, 1);
 	await hooks.get("session_before_fork")();
 	eq((await tools.get("talk_report_context").execute()).details.evidence.length, 0);
