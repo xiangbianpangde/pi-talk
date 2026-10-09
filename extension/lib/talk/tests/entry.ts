@@ -491,7 +491,8 @@ test("extension: actual tool registration enforces target permit and rejects cro
 	const textCtx = { mode: "tui", ui: { select: () => { throw new Error("Unexpected picker"); }, notify: () => {} } };
 	await commands.get("talk").handler("", textCtx);
 	await commands.get("talk").handler("summarize results", textCtx);
-	eq(sent.length, 2);
+	await commands.get("talk").handler("summarize results", { ...textCtx, mode: "rpc" });
+	eq(sent.length, 3);
 	eq(rtBefore.active, false, "ordinary reports do not start side sessions");
 	ok(!rtBefore.server, "ordinary reports do not start a server");
 	eq([...hooks.keys()].join(","), "agent_start,session_shutdown,before_agent_start,tool_result,session_before_switch,session_before_fork,session_tree");
