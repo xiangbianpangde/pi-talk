@@ -141,8 +141,9 @@ test("trigger: lifecycle resets permit, stops in order and only appends while ac
 test("information: shadow scenarios preserve decisions, reject fabricated claims and reset scope", () => {
 	const engine = createInformationEngine();
 	engine.begin("verify output");
+	engine.defineRequirements([{ id: "verify", userAnchor: "verify output", criterion: "assertions pass" }]);
 	engine.collect("check", "test run", "all assertions passed", false);
-	const good = engine.refine("completed", [{ text: "all assertions passed", kind: "result", status: "observed", evidenceIds: ["check"] }], true, ["check"]);
+	const good = engine.refine("completed", [{ text: "all assertions passed", kind: "result", status: "observed", evidenceIds: ["check"] }], true, ["check"], { checks: [{ requirementId: "verify", evidenceIds: ["check"] }] });
 	eq(good.state, "completed");
 	eq(engine.refine("completed", [], true, ["check"]).state, "partial");
 	const fabricated = engine.refine("completed", [{ text: "all requirements met", kind: "result", status: "observed", evidenceIds: ["check"] }], true, ["check"]);
@@ -162,6 +163,21 @@ test("information: shadow scenarios preserve decisions, reject fabricated claims
 	eq(engine.refine("completed", []).state, "unknown");
 });
 
+test("information: failure repair and full requirement coverage govern completion", () => {
+	const e = createInformationEngine(); e.begin("Implement A and B");
+	e.defineRequirements([{ id: "a", userAnchor: "A", criterion: "A tested" }, { id: "b", userAnchor: "B", criterion: "B tested" }]);
+	e.collect("bad", "test A", "failed", true, "check-a");
+	e.collect("pass-a", "test A", "A passed", false, "check-a");
+	e.collect("pass-b", "test B", "B passed", false, "check-b");
+	const claims = [{ text: "A passed", kind: "result" as const, status: "observed" as const, evidenceIds: ["pass-a"] }, { text: "B passed", kind: "result" as const, status: "observed" as const, evidenceIds: ["pass-b"] }];
+	const checks = [{ requirementId: "a", evidenceIds: ["pass-a"] }, { requirementId: "b", evidenceIds: ["pass-b"] }];
+	eq(e.refine("completed", claims, true, ["pass-a", "pass-b"], { checks }).state, "partial");
+	const resolutions = [{ failureId: "bad", verificationId: "pass-a" }];
+	eq(e.refine("completed", claims, true, ["pass-a", "pass-b"], { checks, resolutions }).state, "completed");
+	eq(e.refine("completed", claims, true, ["pass-a"], { checks: checks.slice(0, 1), resolutions }).state, "partial");
+	eq(e.refine("completed", claims, true, ["pass-a", "pass-b"], { checks, resolutions: [{ failureId: "bad", verificationId: "pass-b" }] }).state, "partial");
+});
+
 test("information: shadow matrix covers completed, partial, failed, blocked, unchanged and decision cases", () => {
 	const cases = [
 		{ state: "completed" as const, claims: [{ text: "build passed", kind: "result" as const, status: "observed" as const, evidenceIds: ["ok"] }], expected: "completed" },
@@ -171,8 +187,9 @@ test("information: shadow matrix covers completed, partial, failed, blocked, unc
 	];
 	for (const sample of cases) {
 		const e = createInformationEngine(); e.begin("goal");
+		e.defineRequirements([{ id: "goal", userAnchor: "goal", criterion: "result supported" }]);
 		e.collect(sample.claims[0].evidenceIds[0] || "none", "fixture", sample.claims[0].text, sample.state === "failed");
-		const brief = e.refine(sample.state, sample.claims, true, sample.state === "completed" ? ["ok"] : []);
+		const brief = e.refine(sample.state, sample.claims, true, sample.state === "completed" ? ["ok"] : [], { checks: [{ requirementId: "goal", evidenceIds: ["ok"] }] });
 		eq(brief.state, sample.expected);
 	}
 	const unchanged = createInformationEngine(); unchanged.begin("goal");
@@ -499,6 +516,20 @@ test("session: render persists version + meta", async () => {
 	ok(existsSync(v2File) && readFileSync(v2File, "utf8").includes("v2"), "patch version file on disk");
 	await stopSession(rt);
 });
+test("extension: bare summary retains evidence but message starts new scope", async () => {
+	const hooks = new Map<string, any[]>(), tools = new Map<string, any>();
+	let command: any;
+	registerTalk({ on: (name: string, fn: any) => { hooks.set(name, [...(hooks.get(name) || []), fn]); }, registerTool: (tool: any) => tools.set(tool.name, tool), registerCommand: (_name: string, cmd: any) => { command = cmd; }, sendUserMessage: async () => {} } as any);
+	const before = async (prompt: string) => { for (const fn of hooks.get("before_agent_start")!) await fn({ prompt, systemPrompt: "base" }); };
+	await before("Fix A");
+	await hooks.get("tool_result")![0]({ toolName: "bash", toolCallId: "a", input: {}, content: [{ type: "text", text: "A passed" }], isError: false });
+	await command.handler("", { mode: "tui" }); await before("summarize");
+	eq((await tools.get("talk_report_context").execute()).details.goal, "Fix A");
+	await command.handler("Analyze B", { mode: "tui" }); await before("Analyze B");
+	const context = (await tools.get("talk_report_context").execute()).details;
+	eq(context.goal, "Analyze B"); eq(context.evidence.length, 0);
+});
+
 test("extension: actual tool registration enforces target permit and rejects cross-style patches", async () => {
 	const tools = new Map<string, any>();
 	const hooks = new Map<string, any>();
