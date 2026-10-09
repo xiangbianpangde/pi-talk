@@ -139,7 +139,7 @@ export default function (pi: ExtensionAPI) {
 			resolutions: Type.Optional(Type.Array(Type.Object({ failureId: Type.String(), verificationId: Type.String() }))),
 			claims: Type.Array(Type.Object({ text: Type.String(), kind: Type.Union([Type.Literal("result"), Type.Literal("risk"), Type.Literal("blocker"), Type.Literal("decision")]), status: Type.Union([Type.Literal("observed"), Type.Literal("inferred"), Type.Literal("unverified")]), evidenceIds: Type.Array(Type.String()) })),
 		}),
-		async execute(_id, params) { const brief = information.refine(params.state, params.claims, params.explicit ?? true, params.acceptanceEvidenceIds, { checks: params.checks, resolutions: params.resolutions }); return { content: [{ type: "text", text: briefText(brief) }], details: brief }; },
+		async execute(_id, params) { const brief = information.refine(params.state, params.claims, params.explicit ?? opportunity?.cause === "explicit", params.acceptanceEvidenceIds, { checks: params.checks, resolutions: params.resolutions }); return { content: [{ type: "text", text: briefText(brief) }], details: brief }; },
 	});
 
 	pi.registerCommand("talk", {

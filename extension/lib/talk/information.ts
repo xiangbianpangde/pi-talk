@@ -6,7 +6,7 @@ export interface Requirement { id: string; userAnchor: string; criterion: string
 export interface RequirementCheck { requirementId: string; evidenceIds: string[] }
 export interface FailureResolution { failureId: string; verificationId: string }
 export interface AcceptanceMap { checks?: RequirementCheck[]; resolutions?: FailureResolution[] }
-export interface Claim { text: string; kind: "result" | "risk" | "blocker" | "decision"; status: "observed" | "inferred" | "unverified"; evidenceIds: string[] }
+export interface Claim { text: string; kind: "result" | "risk" | "blocker" | "decision"; status: "observed" | "inferred" | "unverified"; evidenceIds: string[]; value?: number }
 export interface Brief { state: TaskState; claims: Claim[]; delivery: "send" | "suppress"; warnings: string[] }
 const fingerprint = (value: string) => createHash("sha256").update(value).digest("hex");
 
@@ -51,7 +51,9 @@ export function createInformationEngine() {
 				const sources = c.evidenceIds.filter((id) => known.has(id));
 				const observed = c.status === "observed" && sources.length > 0 && sources.every((id) => known.get(id)!.text.includes(c.text));
 				if (c.status === "observed" && !observed) warnings.push("Claim not directly supported; downgraded to unverified.");
-				return { ...c, evidenceIds: sources, status: c.status === "observed" && !observed ? "unverified" : c.status };
+				const status = c.status === "observed" && !observed ? "unverified" : c.status;
+				const value = (c.kind === "blocker" ? 4 : c.kind === "risk" ? 3 : c.kind === "decision" ? 3 : 2) + (sources.length ? 1 : 0) + (status === "unverified" ? 1 : 0);
+				return { ...c, evidenceIds: sources, status, value };
 			});
 			const resolved = new Set<string>();
 			for (const link of mapping.resolutions || []) {
@@ -63,9 +65,10 @@ export function createInformationEngine() {
 			const unresolved = evidence.filter((e) => e.failed && !resolved.has(e.id));
 			for (const e of unresolved) {
 				if (!claims.some((c) => c.evidenceIds.includes(e.id) && (c.kind === "risk" || c.kind === "blocker"))) {
-					claims.push({ text: `Tool failure: ${e.locator}`, kind: "risk", status: "unverified", evidenceIds: [e.id] });
+					claims.push({ text: `Tool failure: ${e.locator}`, kind: "risk", status: "unverified", evidenceIds: [e.id], value: 5 });
 				}
 			}
+			claims.sort((a, b) => (b.value ?? 0) - (a.value ?? 0));
 			const acceptance = acceptanceEvidenceIds.length > 0 && acceptanceEvidenceIds.every((id) =>
 				known.has(id) && !known.get(id)!.failed && claims.some((c) =>
 					c.kind === "result" && c.status === "observed" && c.evidenceIds.includes(id)));
