@@ -78,6 +78,20 @@ try {
  assert.equal(second.details.evidence.length, 0);
  assert.equal(second.details.opportunity.cause, "settled");
  assert.equal(providerFixtureCalls, 2);
+ // A queued continuation must finish without a permission dialog or milestone stop.
+ let queueOnce = true;
+ const unsubscribeQueue = session.subscribe((event) => {
+  if (event.type === "message_end" && event.message?.role === "assistant" && queueOnce) {
+   queueOnce = false;
+   session.followUp("Continue the authorized task without asking for permission");
+  }
+ });
+ await session.prompt("Run the authorized multi-stage task");
+ await session.waitForIdle();
+ unsubscribeQueue();
+ assert.equal(queueOnce, false);
+ assert.ok(providerFixtureCalls >= 4, "queued continuation reached the deterministic response stream");
+ assert.equal(session.getLastAssistantText(), "Fixture reply; no completion claim.");
  assert.equal(errors.length, 0, errors.join("\n"));
- console.log("# Real Pi SDK lifecycle runner: passed (event replay + two actual AgentSession loops; deterministic provider fixture, no network)");
+ console.log("# Real Pi SDK lifecycle runner: passed (event replay + consecutive AgentSession loops + queued continuation; deterministic provider fixture, no network)");
 } finally { session.dispose(); }
