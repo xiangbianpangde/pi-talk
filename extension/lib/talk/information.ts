@@ -13,11 +13,16 @@ const tokens = (value: string) => value.toLowerCase().match(/[a-z0-9]+|[\u4e00-\
 const meaningful = (value: string) => tokens(value).filter((t) => !STOPWORDS.has(t));
 const numbers = (value: string) => (value.match(/\d+(?:\.\d+)?/g) || []).sort();
 function supportsClaim(claim: string, evidence: string): boolean {
-	if (evidence.toLowerCase().includes(claim.toLowerCase())) return true;
+	if (evidence.trim().toLowerCase() === claim.trim().toLowerCase()) return true;
 	const claimNumbers = numbers(claim), evidenceNumbers = numbers(evidence);
 	if (claimNumbers.some((n) => !evidenceNumbers.includes(n))) return false;
-	const wanted = meaningful(claim), available = new Set(meaningful(evidence));
-	return wanted.length > 0 && wanted.every((token) => available.has(token));
+	const negation = /\b(?:not|never|without|failed|error|no)\b|不|未|无|没有|失败|错误/.test(claim.toLowerCase());
+	const evidenceNegation = /\b(?:not|never|without|failed|error|no)\b|不|未|无|没有|失败|错误/.test(evidence.toLowerCase());
+	if (negation !== evidenceNegation) return false;
+	// Token presence across a log is not entailment. Permit only the same ordered
+	// tokens after removing harmless quantity articles; never reorder or subset.
+	const wanted = meaningful(claim), available = meaningful(evidence);
+	return wanted.length > 0 && JSON.stringify(wanted) === JSON.stringify(available);
 }
 const fingerprint = (value: string) => createHash("sha256").update(value).digest("hex");
 
@@ -60,7 +65,7 @@ export function createInformationEngine() {
 			const known = new Map(evidence.map((e) => [e.id, e]));
 			const seen = new Set<string>();
 			const claims = candidates.filter((c) => {
-				const key = meaningful(c.text).join(" ") + "|" + numbers(c.text).join(",");
+				const key = JSON.stringify([c.kind, c.status, c.text.trim().replace(/\s+/g, " "), [...c.evidenceIds].sort()]);
 				if (!key || seen.has(key)) return false;
 				seen.add(key); return true;
 			}).map((c): Claim => {

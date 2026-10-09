@@ -151,8 +151,12 @@ test("information: shadow scenarios preserve decisions, reject fabricated claims
 	paraphraseEngine.collect("check", "test run", "46 tests passed", false);
 	const paraphrase = paraphraseEngine.refine("partial", [{ text: "all 46 tests passed", kind: "result", status: "observed", evidenceIds: ["check"] }], true);
 	eq(paraphrase.claims[0].status, "observed");
+	const negation = paraphraseEngine.refine("partial", [{ text: "46 tests failed", kind: "result", status: "observed", evidenceIds: ["check"] }], true);
+	eq(negation.claims[0].status, "unverified");
 	const wrongNumber = engine.refine("partial", [{ text: "all 47 tests passed", kind: "result", status: "observed", evidenceIds: ["check"] }], true);
 	eq(wrongNumber.claims[0].status, "unverified");
+	const reordered = paraphraseEngine.refine("partial", [{ text: "passed tests 46", kind: "result", status: "observed", evidenceIds: ["check"] }], true);
+	eq(reordered.claims[0].status, "unverified");
 	const fabricated = engine.refine("completed", [{ text: "all requirements met", kind: "result", status: "observed", evidenceIds: ["check"] }], true, ["check"]);
 	eq(fabricated.state, "partial");
 	eq(fabricated.claims[0].status, "unverified");

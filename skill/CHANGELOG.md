@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.3.0
+
+- Apply the user's 5/5 preference for conclusion/status-first, decision-oriented reporting without forcing a template.
+- Keep facts, limitations and unfinished work visible; omit routine process narration.
+
 ## 1.2.0
 
 - Ordinary reports use the main transcript with no format picker, session or browser.
