@@ -53,6 +53,15 @@ try {
 	});
 	console.log("# Isolated talk test home: " + home);
 	execFileSync(process.execPath, [out], { stdio: "inherit", env });
+	if (process.env.PI_CODING_AGENT_PACKAGE) {
+		const sdkExtension = join(sandbox, "talk.mjs");
+		await build({ entryPoints: [join(extensionDir, "talk.ts")], bundle: true, platform: "node", format: "esm", outfile: sdkExtension,
+			plugins: [{ name: "sdk-dependencies", setup(build) {
+				build.onResolve({ filter: /\.\.\/\.\.\/\.\.\/npm\/node_modules\/parse5\/dist\/index\.js$/ }, () => ({ path: parse5Path }));
+				build.onResolve({ filter: /^typebox$/ }, () => ({ path: typeboxPath }));
+			} }], logLevel: "silent" });
+		execFileSync(process.execPath, [join(here, "pi-lifecycle.mjs")], { stdio: "inherit", env: { ...env, TALK_SDK_EXTENSION: sdkExtension } });
+	}
 	// Run source suites so relative source imports still resolve to this checkout.
 	if (existsSync(sourceStyles)) for (const pack of readdirSync(sourceStyles, { withFileTypes: true }).filter((d) => d.isDirectory())) {
 		const tests = join(sourceStyles, pack.name, "tests");

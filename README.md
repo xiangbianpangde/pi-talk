@@ -19,6 +19,10 @@ Patch governance now resolves the existing target surface before auditing or che
 
 Run isolated regression tests with `node extension/lib/talk/tests/run-tests.mjs`. For release verification use `TALK_REQUIRE_CHROME=1 node extension/lib/talk/tests/run-tests.mjs`; missing Chromium is a failure in release mode, otherwise browser-dependent cases explicitly report SKIP. The runner still depends on locally installed esbuild, parse5 and typebox; it is not yet a portable CI environment. Chromium can fail intermittently on macOS without a usable display context; a failed run is not automatically retried or reported as passing.
 
+### Real Pi SDK runner validation
+
+Set `PI_CODING_AGENT_PACKAGE` to the installed Pi package directory when running the isolated regression runner to include `tests/pi-lifecycle.mjs`. The test uses Pi's actual `DefaultResourceLoader`, in-memory `AgentSession` and `ExtensionRunner` to load the bundled extension, dispatch task start, tool result, settlement replay/abort, fork boundary and shutdown, and assert evidence/branch state via the real tool definition. This offline test makes no provider calls and does not prove behavior under live model retries or actual session replacement. Raw checkout loading initially failed because legacy parse5 imports resolve relative to an installed layout; the test bundles dependencies explicitly rather than claiming checkout portability is fixed.
+
 ### Authorized local-history replay (2026-10-09)
 
 `extension/lib/talk/tests/history-evaluation.ts` is an opt-in, read-only local history evaluator. It selects at most two tasks per session, excludes compacted/branched histories, and requires a user prompt, tool results and a final assistant reply. It emits counts and timings only, never raw task text, file paths or tool payloads. It is not part of normal regression tests and requires explicit permission to access history.
