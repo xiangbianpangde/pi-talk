@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.5.0
+
+- Suppress producer-classified routine automatic drafts without keyword-based misclassification of real deliverables.
+- Brief delivery returns a continuation instruction; even a blocker label does not by itself require user involvement.
+- Fold routine milestones and next-step narration into the final delivery instead of ending the task.
+
 ## 1.4.0
 
 - Stage updates are non-blocking and require consequential change; milestones and commits do not end execution.

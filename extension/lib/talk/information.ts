@@ -7,7 +7,7 @@ export interface RequirementCheck { requirementId: string; evidenceIds: string[]
 export interface FailureResolution { failureId: string; verificationId: string }
 export interface AcceptanceMap { checks?: RequirementCheck[]; resolutions?: FailureResolution[] }
 export interface Claim { text: string; kind: "result" | "risk" | "blocker" | "decision"; status: "observed" | "inferred" | "unverified"; evidenceIds: string[]; value?: number }
-export interface Brief { state: TaskState; claims: Claim[]; delivery: "send" | "suppress"; warnings: string[]; reason?: "explicit" | "material-change" | "unchanged" | "insufficient-evidence" }
+export interface Brief { state: TaskState; claims: Claim[]; delivery: "send" | "suppress"; warnings: string[]; reason?: "explicit" | "material-change" | "unchanged" | "insufficient-evidence"; continuation: "continue" }
 const STOPWORDS = new Set(["a", "an", "the", "all", "已", "已完成", "完成", "全部", "所有", "的", "了", "并", "且"]);
 const tokens = (value: string) => value.toLowerCase().match(/[a-z0-9]+|[\u4e00-\u9fff]+/g) || [];
 const meaningful = (value: string) => tokens(value).filter((t) => !STOPWORDS.has(t));
@@ -25,6 +25,7 @@ function supportsClaim(claim: string, evidence: string): boolean {
 	return wanted.length > 0 && JSON.stringify(wanted) === JSON.stringify(available);
 }
 const fingerprint = (value: string) => createHash("sha256").update(value).digest("hex");
+
 
 /** Ephemeral evidence scope: reset on each user goal and branch transition. No raw persistence. */
 export function createInformationEngine() {
@@ -60,7 +61,7 @@ export function createInformationEngine() {
 			}
 		},
 		context() { return { goal, requirements: requirements.map((r) => ({ ...r })), evidence: evidence.map((e) => ({ ...e })), incomplete, goalIncomplete, droppedFailure }; },
-		refine(state: TaskState, candidates: Claim[], explicit = true, acceptanceEvidenceIds: string[] = [], mapping: AcceptanceMap = {}): Brief {
+		refine(state: TaskState, candidates: Claim[], explicit = true, acceptanceEvidenceIds: string[] = [], mapping: AcceptanceMap = {}, updatePurpose: "outcome" | "routine" = "outcome"): Brief {
 			const warnings: string[] = [];
 			const known = new Map(evidence.map((e) => [e.id, e]));
 			const seen = new Set<string>();
@@ -108,10 +109,17 @@ export function createInformationEngine() {
 			if (goalIncomplete || droppedFailure) warnings.push("Critical goal or failure context is missing; completion cannot be established.");
 			const current = fingerprint(JSON.stringify({ state, claims }));
 			const unchanged = current === previous;
-			const delivery = !explicit && (unchanged || state === "unknown" || !claims.length) ? "suppress" : "send";
-			previous = current;
-			const reason = explicit ? "explicit" : unchanged ? "unchanged" : state === "unknown" || !claims.length ? "insufficient-evidence" : "material-change";
-			return { state, claims, delivery, warnings, reason };
+			// Producer classification, not a keyword heuristic: tests/commits can be consequential.
+			const processOnly = updatePurpose === "routine" && !claims.some((c) => c.kind === "blocker" || c.kind === "risk" || c.kind === "decision");
+			const delivery = !explicit && (unchanged || state === "unknown" || !claims.length || processOnly) ? "suppress" : "send";
+			if (processOnly) warnings.push("Stage-only update suppressed; continue the authorized task without asking the user.");
+			// Suppressed routine drafts are not a delivered baseline.
+			if (delivery === "send") previous = current;
+			const reason = explicit ? "explicit" : unchanged || processOnly ? "unchanged" : state === "unknown" || !claims.length ? "insufficient-evidence" : "material-change";
+			// A blocker may have agent-resolvable alternatives. This draft cannot grant
+			// permission to stop or infer that the user must act.
+			const continuation = "continue" as const;
+			return { state, claims, delivery, warnings, reason, continuation };
 		},
 	};
 }

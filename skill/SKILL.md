@@ -2,7 +2,7 @@
 name: talk
 description: Task-focused reporting in the main conversation, with evidence checks and optional explicitly requested HTML, diagrams, images or canvas. Use for /talk and task summaries; never automatically open rich-media surfaces for ordinary reports.
 metadata:
-  version: "1.4.0"
+  version: "1.5.0"
   status: "active"
   layer: "task"
   priority: "40"
@@ -33,7 +33,7 @@ Passing tests is evidence for those tests, not proof that every requirement is s
 
 A stage update is a **non-blocking progress message**, not a task boundary. Continue execution after it within the user's authorized scope. Do not end a run just to announce a commit, passing test count, plan or routine step; do not ask “continue?” when continuation is already authorized.
 
-Send an update only for a consequential new result, changed risk, user decision or real blocker. Suppress unchanged or empty automatic drafts. Explicit user requests still receive an answer. Keep the final answer for delivery, actual blocking input, or a required authorization—not merely a milestone.
+Send an update only for a consequential new result, changed risk, user decision or real blocker. Suppress unchanged, empty, plan-only, commit-only, test-count-only and “what happens next” automatic drafts. The producer must mark a draft `routine` or `outcome`; do not infer routine status from words alone because a test or commit can be a consequential deliverable. Fold routine milestones into the eventual result instead of stopping to announce them. A brief never grants permission to stop: every update returns to the authorized task flow. Only a separately identified missing input, changed scope or real external authorization can require the user. Explicit user requests still receive an answer. Keep the final answer for delivery, actual blocking input, or a required authorization—not merely a milestone.
 
 Ask only for essential missing input, a changed scope or an operation that actually requires permission. State the specific object, effect and alternatives. Never ask again for permission already granted. Ordinary text reports require no presentation authorization. The explicit formal rich-media gate does not prove factual completion and must not stop normal task execution.
 

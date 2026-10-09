@@ -251,6 +251,15 @@ test("information: shadow matrix covers completed, partial, failed, blocked, unc
 	const empty = unchanged.refine("unknown", [], false);
 	eq(empty.delivery, "suppress", "empty automatic stage update is suppressed");
 	eq(empty.reason, "insufficient-evidence");
+	const stage = unchanged.refine("partial", [{ text: "已提交 commit，测试通过", kind: "result", status: "inferred", evidenceIds: [] }], false, [], {}, "routine");
+	eq(stage.delivery, "suppress", "process-only stage report is suppressed");
+	eq(stage.reason, "unchanged");
+	const afterRoutine = unchanged.refine("partial", [{ text: "real new finding", kind: "result", status: "inferred", evidenceIds: [] }], false, [], {}, "outcome");
+	eq(afterRoutine.delivery, "send", "routine suppression does not hide later outcomes");
+	const blocker = unchanged.refine("blocked", [{ text: "需要用户提供生产凭据", kind: "blocker", status: "inferred", evidenceIds: [] }], false, [], {}, "routine");
+	eq(blocker.delivery, "send", "real blocker is delivered");
+	eq(blocker.continuation, "continue", "a blocker label alone does not prove user input is required");
+	eq(stage.continuation, "continue");
 	const decision = unchanged.refine("blocked", [{ text: "Choose target", kind: "decision", status: "inferred", evidenceIds: [] }], true);
 	eq(decision.claims[0].kind, "decision");
 });
