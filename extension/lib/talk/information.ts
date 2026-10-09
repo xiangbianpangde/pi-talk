@@ -8,6 +8,17 @@ export interface FailureResolution { failureId: string; verificationId: string }
 export interface AcceptanceMap { checks?: RequirementCheck[]; resolutions?: FailureResolution[] }
 export interface Claim { text: string; kind: "result" | "risk" | "blocker" | "decision"; status: "observed" | "inferred" | "unverified"; evidenceIds: string[]; value?: number }
 export interface Brief { state: TaskState; claims: Claim[]; delivery: "send" | "suppress"; warnings: string[] }
+const STOPWORDS = new Set(["a", "an", "the", "all", "已", "已完成", "完成", "全部", "所有", "的", "了", "并", "且"]);
+const tokens = (value: string) => value.toLowerCase().match(/[a-z0-9]+|[\u4e00-\u9fff]+/g) || [];
+const meaningful = (value: string) => tokens(value).filter((t) => !STOPWORDS.has(t));
+const numbers = (value: string) => (value.match(/\d+(?:\.\d+)?/g) || []).sort();
+function supportsClaim(claim: string, evidence: string): boolean {
+	if (evidence.toLowerCase().includes(claim.toLowerCase())) return true;
+	const claimNumbers = numbers(claim), evidenceNumbers = numbers(evidence);
+	if (claimNumbers.some((n) => !evidenceNumbers.includes(n))) return false;
+	const wanted = meaningful(claim), available = new Set(meaningful(evidence));
+	return wanted.length > 0 && wanted.every((token) => available.has(token));
+}
 const fingerprint = (value: string) => createHash("sha256").update(value).digest("hex");
 
 /** Ephemeral evidence scope: reset on each user goal and branch transition. No raw persistence. */
@@ -49,12 +60,12 @@ export function createInformationEngine() {
 			const known = new Map(evidence.map((e) => [e.id, e]));
 			const seen = new Set<string>();
 			const claims = candidates.filter((c) => {
-				const key = c.text.trim().replace(/\s+/g, " ");
+				const key = meaningful(c.text).join(" ") + "|" + numbers(c.text).join(",");
 				if (!key || seen.has(key)) return false;
 				seen.add(key); return true;
 			}).map((c): Claim => {
 				const sources = c.evidenceIds.filter((id) => known.has(id));
-				const observed = c.status === "observed" && sources.length > 0 && sources.every((id) => known.get(id)!.text.includes(c.text));
+				const observed = c.status === "observed" && sources.length > 0 && sources.every((id) => supportsClaim(c.text, known.get(id)!.text));
 				if (c.status === "observed" && !observed) warnings.push("Claim not directly supported; downgraded to unverified.");
 				const status = c.status === "observed" && !observed ? "unverified" : c.status;
 				const value = (c.kind === "blocker" ? 4 : c.kind === "risk" ? 3 : c.kind === "decision" ? 3 : 2) + (sources.length ? 1 : 0) + (status === "unverified" ? 1 : 0);
