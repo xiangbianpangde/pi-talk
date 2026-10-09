@@ -109,6 +109,13 @@ export default function (pi: ExtensionAPI) {
 		if (event.toolName.startsWith("talk_")) return;
 		information.collect(event.toolCallId, event.toolName, event.content.filter((c) => c.type === "text").map((c) => c.text).join("\n"), event.isError);
 	});
+	pi.on("agent_settled", (event, ctx) => {
+		if (event.aborted || !information.context().goal) return;
+		opportunity = opportunities.accept({
+			id: `settled-${sequence}`, taskId: opportunity?.taskId || `task-${sequence}`,
+			branchId: ctx.sessionManager.getLeafId() || ctx.sessionManager.getSessionId(), cause: "settled",
+		});
+	});
 	for (const event of ["session_before_switch", "session_before_fork", "session_tree"] as const) pi.on(event, () => { information.begin(""); opportunity = undefined; reportRequestPending = false; opportunities.reset(); });
 
 	pi.registerTool({
