@@ -51,6 +51,30 @@ export function createOpportunityRouter() {
 	};
 }
 
+/** Task-boundary state only. Evidence storage and prompt/presentation policy stay outside. */
+export function createReportScope() {
+	const router = createOpportunityRouter();
+	let sequence = 0;
+	let summarizePending = false;
+	let opportunity: ReportOpportunity | undefined;
+	return {
+		requestSummary() { summarizePending = true; },
+		start(branchId: string, hasGoal: boolean) {
+			const preserveEvidence = summarizePending && hasGoal;
+			summarizePending = false;
+			opportunity = router.accept({ id: `prompt-${++sequence}`, taskId: `task-${sequence}`, branchId, cause: "explicit", explicitFormat: "text" });
+			return { preserveEvidence, opportunity };
+		},
+		settle(branchId: string, aborted: boolean, hasGoal: boolean) {
+			if (aborted || !hasGoal) return;
+			const settled = router.accept({ id: `settled-${sequence}`, taskId: opportunity?.taskId || `task-${sequence}`, branchId, cause: "settled" });
+			if (settled) opportunity = settled;
+		},
+		current() { return opportunity; },
+		reset() { summarizePending = false; opportunity = undefined; router.reset(); },
+	};
+}
+
 export interface TalkTriggerDependencies {
 	resetPermit(): void;
 	stop(): Promise<void>;
