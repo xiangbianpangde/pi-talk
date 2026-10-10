@@ -44,6 +44,10 @@ All SDK tests run against actual installed Pi in isolated HOME. Provider fixture
 | Task-boundary state extraction | createReportScope owns start/summary/settled/reset state | PASS; evidence collection and presentation adapters remain in talk.ts |
 | Full trigger boundary/freeze review | Complete review not obtained | OPEN; do not freeze whole Trigger Engine |
 
+## Side-channel review
+
+Existing `/review` and `/codex-review` entrances were run read-only with the configured model. Broad review was blocked by truncated source, so it is not a freeze approval. Smaller commit reviews approved the queue and cancellation deltas with explicit surrounding-source limitations. Review of task-boundary extraction found a pending-summary regression: bare `/talk` followed by nonempty `/talk` before start could retain old evidence. The pending flag now accepts a boolean, nonempty requests clear it, and a targeted regression passes. This is same-model side-channel review, not independent human or different-model acceptance. Raw review output remains local.
+
 ## Quality and cost
 
 - Twenty unique local-history structural replays: control invariants, not independent semantic A/B.
