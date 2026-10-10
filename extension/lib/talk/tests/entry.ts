@@ -75,6 +75,8 @@ test("trigger: report scope preserves only requested summary and resets branch b
 	const exposed = scope.current(); if (exposed) exposed.taskId = "tampered";
 	ok(scope.current()?.taskId !== "tampered", "external copy cannot mutate internal task");
 	scope.settle("other-branch", false, true); ok(scope.current()?.branchId !== "other-branch");
+	const activeTask = scope.current()?.id;
+	scope.settle("other-branch", true, false); eq(scope.current()?.id, activeTask, "stale branch abort cannot clear current scope");
 	scope.requestSummary(); scope.requestSummary(false);
 	eq(scope.start("a", true).preserveEvidence, false, "nonempty request clears unconsumed bare summary intent");
 	scope.requestSummary(); scope.reset();
@@ -143,6 +145,15 @@ test("trigger: lifecycle registration preserves event names and ordering", async
 	lifecycle.dispose();
 	eq(hooks.size, 0, "dispose removes all registered lifecycle handlers");
 	lifecycle.registerSessionHooks(); eq(hooks.size, 0, "disposal is terminal");
+});
+
+test("trigger: disposal attempts every callback even if an unsubscribe fails", () => {
+	let invoked = 0;
+	const lifecycle = registerTalkLifecycle({ on: () => () => { invoked++; if (invoked === 1) throw new Error("unsubscribe failed"); } }, { resetPermit: () => {}, stop: async () => {}, isActive: () => false, appendix: () => "" });
+	lifecycle.registerSessionHooks();
+	let failed = false; try { lifecycle.dispose(); } catch { failed = true; }
+	ok(failed); eq(invoked, 3);
+	lifecycle.registerSessionHooks(); lifecycle.dispose(); eq(invoked, 3);
 });
 
 test("trigger: lifecycle resets permit, stops in order and only appends while active", async () => {

@@ -62,15 +62,15 @@ export function createReportScope() {
 	return {
 		requestSummary(pending = true) { summarizePending = pending; },
 		start(branchId: string, hasGoal: boolean) {
-			const preserveEvidence = summarizePending && hasGoal && opportunity?.branchId === branchId;
+			const preserveEvidence = Boolean(summarizePending && hasGoal && opportunity?.branchId === branchId);
 			summarizePending = false;
 			router.reset();
 			opportunity = router.accept({ id: `prompt-${++sequence}`, taskId: `task-${sequence}`, branchId, cause: "explicit", explicitFormat: "text" });
 			return { preserveEvidence, opportunity: opportunity ? { ...opportunity } : undefined };
 		},
 		settle(branchId: string, aborted: boolean, hasGoal: boolean) {
-			if (aborted || !hasGoal) { opportunity = undefined; return; }
 			if (!opportunity || opportunity.branchId !== branchId) return;
+			if (aborted || !hasGoal) { opportunity = undefined; return; }
 			const settled = router.accept({ id: `settled-${sequence}`, taskId: opportunity.taskId, branchId, cause: "settled" });
 			if (settled) opportunity = settled;
 		},
@@ -98,7 +98,13 @@ export function registerTalkLifecycle(pi: Pick<ExtensionAPI, "on">, deps: TalkTr
 			dispose.push(pi.on("session_shutdown", () => handlers.sessionShutdown()));
 			dispose.push(pi.on("before_agent_start", (event) => handlers.beforeAgentStart(event)));
 		},
-		dispose() { disposed = true; for (const off of dispose.splice(0)) off?.(); },
+		dispose() {
+			disposed = true;
+			const callbacks = dispose.splice(0);
+			let firstError: unknown;
+			for (const off of callbacks) { try { off?.(); } catch (error) { firstError ??= error; } }
+			if (firstError) throw firstError;
+		},
 	};
 }
 
