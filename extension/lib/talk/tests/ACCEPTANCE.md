@@ -40,7 +40,7 @@ All SDK tests run against actual installed Pi in isolated HOME. Provider fixture
 | Fresh process resume | New Node process opens synthetic persisted history | PASS; transcript restored, evidence clears |
 | Crash during write | Not executed | OPEN; fresh-process resume is not crash-consistency proof |
 | Manual compaction | Actual session.compact with fixture summary override | PASS; ephemeral goal/evidence unchanged, compaction entry persisted |
-| Automatic compaction during queued task | Actual AgentSession threshold fixture + queued follow-up and compaction_end | PASS with synthetic usage; no real provider compaction race |
+| Automatic compaction during queued task | Actual AgentSession threshold fixture + queued follow-up; full event trace assertions | PASS with synthetic usage: queued → threshold-start → threshold-end → stream-2; every marker must exist. No real provider compaction race. |
 | Real provider retry/abort race | Not executed | OPEN |
 | Task-boundary state extraction | createReportScope owns start/summary/settled/reset state | PASS; evidence collection and presentation adapters remain in talk.ts |
 | Full trigger boundary/freeze review | Complete review not obtained | OPEN; do not freeze whole Trigger Engine |
@@ -48,6 +48,12 @@ All SDK tests run against actual installed Pi in isolated HOME. Provider fixture
 ## Side-channel review
 
 Existing `/review` and `/codex-review` entrances were run read-only with the configured model. Broad review was blocked by truncated source, so it is not a freeze approval. Smaller commit reviews approved the queue and cancellation deltas with explicit surrounding-source limitations. Review of task-boundary extraction found a pending-summary regression: bare `/talk` followed by nonempty `/talk` before start could retain old evidence. The pending flag now accepts a boolean, nonempty requests clear it, and a targeted regression passes. This is same-model side-channel review, not independent human or different-model acceptance. Raw review output remains local.
+
+### Test-review corrections
+
+Side-channel review of the compaction test found that counting compactions and streams did not establish their ordering. The test now requires every trace marker to exist and asserts queueing precedes threshold compaction, which completes before the second provider invocation. An intermediate vacuous assertion was discarded rather than accepted as verification. The installed Pi emits `compaction_end` with `reason="threshold"`, not `auto_compaction_end`; the test follows the actual API.
+
+Review also identified that the controlled completion probe could pass without the requested `routine` mode. It now inspects the actual publication tool arguments (`state=completed`, `publish=true`, `explicit=false`, `updatePurpose=routine`) and requires observed result claims, requirement registration and evidence mapping. A tightened live rerun passed. The single-commit reviewer initially lacked the earlier queued-scope test; the ledger now cites `f85bba1` and its precise ExtensionRunner boundary rather than claiming an OS process-switch race.
 
 ## Quality and cost
 
