@@ -208,6 +208,12 @@ test("information: shadow scenarios preserve decisions, reject fabricated claims
 	engine.collect("check", "test run", "all assertions passed", false);
 	const good = engine.refine("completed", [{ text: "all assertions passed", kind: "result", status: "observed", evidenceIds: ["check"] }], true, ["check"], { checks: [{ requirementId: "verify", evidenceIds: ["check"] }] });
 	eq(good.state, "completed");
+	const completionEngine = createInformationEngine();
+	completionEngine.begin("verify output");
+	completionEngine.defineRequirements([{ id: "verify", userAnchor: "verify output", criterion: "assertions pass" }]);
+	completionEngine.collect("check", "test", "all assertions passed", false);
+	const completion = completionEngine.refine("completed", [{ text: "all assertions passed", kind: "result", status: "observed", evidenceIds: ["check"] }], false, ["check"], { checks: [{ requirementId: "verify", evidenceIds: ["check"] }] }, "routine", false);
+	eq(completion.delivery, "send", "validated task completion overrides accidental routine label");
 	eq(engine.refine("completed", [], true, ["check"]).state, "partial");
 	const paraphraseEngine = createInformationEngine();
 	paraphraseEngine.begin("verify output");

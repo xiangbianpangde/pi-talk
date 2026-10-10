@@ -113,7 +113,9 @@ export function createInformationEngine() {
 			const current = fingerprint(JSON.stringify({ state, claims }));
 			const unchanged = current === previous;
 			// Producer classification, not a keyword heuristic: tests/commits can be consequential.
-			const processOnly = updatePurpose === "routine" && !claims.some((c) => c.kind === "blocker" || c.kind === "risk" || c.kind === "decision");
+			// Validated task completion must not disappear because the producer labels
+			// it routine. Other result importance remains a producer judgment.
+			const processOnly = updatePurpose === "routine" && state !== "completed" && !claims.some((c) => c.kind === "blocker" || c.kind === "risk" || c.kind === "decision");
 			const delivery = !explicit && (unchanged || state === "unknown" || !claims.length || processOnly) ? "suppress" : "send";
 			if (processOnly) warnings.push("Stage-only update suppressed; continue the authorized task without asking the user.");
 			// Suppressed routine drafts are not a delivered baseline.
