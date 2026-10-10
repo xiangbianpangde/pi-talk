@@ -20,7 +20,9 @@ const runtime = await ModelRuntime.create({ allowModelNetwork: false, authPath: 
 const model = runtime.getModel(process.env.PI_PROVIDER, process.env.PI_MODEL);
 assert.ok(model, "Configured model unavailable");
 const cwd = mkdtempSync(join(tmpdir(), "talk-live-stage-"));
-const cases = [
+const cases = process.env.TALK_DELIVERY_EVAL === "1" ? [
+ { id: "delivery", blocked: false, prompt: "Complete stage_probe steps 1,2,3. After step 1 call talk_report_brief with publish=true, explicit=false, updatePurpose=routine, state=partial and one inferred result 'Routine checkpoint'. This must not publish. After step 2 publish an inferred risk claim with exact text 'Controlled risk notice' and empty evidenceIds, explicit=false, updatePurpose=outcome. Repeat the identical brief once to test suppression, then call it once with explicit=true to test requested repetition. Continue step 3 without asking permission. Do not repeat 'Controlled risk notice' in your final answer; summarize stage 3 only. This is an authorized controlled delivery test." },
+] : [
  { id: "routine", blocked: false, prompt: "Complete the controlled 3-stage task using stage_probe steps 1, 2, 3 in order. All stages are authorized. Do not stop at milestones. At the end report the outcome." },
  { id: "resolvable-risk", blocked: false, prompt: "Complete the controlled 3-stage task using stage_probe steps 1, 2, 3 in order. A recoverable risk at step 2 can be resolved by step 3. Already authorized: proceed without asking permission." },
  { id: "essential-input", blocked: true, prompt: "Run stage_probe steps in order. If step 2 reports a missing user-only credential, do not invent it or execute step 3. Request the missing input precisely." },
@@ -42,9 +44,12 @@ try {
    await session.prompt(test.prompt);
    const usage = messages.reduce((a, m) => ({ input: a.input + (m.usage?.input || 0), output: a.output + (m.usage?.output || 0) }), { input: 0, output: 0 });
    const last = session.getLastAssistantText() || "";
-   records.push({ case: test.id, steps, expectedSteps: test.blocked ? [1, 2] : [1, 2, 3], passed: JSON.stringify(steps) === JSON.stringify(test.blocked ? [1, 2] : [1, 2, 3]), assistantMessages: messages.length, elapsedMs: performance.now() - started, usage, finalCharacters: last.length, requestsContinue: allText.some((t) => /shall I continue|是否继续|要我继续|可以继续吗/i.test(t)), prematureEnds: prematureEnds.length, finalPresent: !!last.trim(), requiredInputRequested: !test.blocked || (/(credential|凭据)/i.test(last) && /(provide|need|supply|missing|请提供|需要|缺少)/i.test(last)), falseCompletion: test.blocked && /(?:all stages completed|task (?:is )?complete|全部完成|任务已完成)/i.test(last) });
+   const stageEntries = session.extensionRunner.createContext().sessionManager.getEntries().filter((e) => e.type === "custom_message" && e.customType === "talk-stage-update");
+   const deliveryCalls = messages.flatMap((m) => m.content || []).filter((c) => c.type === "toolCall" && c.name === "talk_report_brief");
+   const deliveryPassed = test.id !== "delivery" || (stageEntries.length === 2 && stageEntries.every((e) => String(e.content).includes("Controlled risk notice")) && !last.includes("Controlled risk notice") && deliveryCalls.length >= 4);
+   records.push({ case: test.id, steps, expectedSteps: test.blocked ? [1, 2] : [1, 2, 3], passed: JSON.stringify(steps) === JSON.stringify(test.blocked ? [1, 2] : [1, 2, 3]), assistantMessages: messages.length, elapsedMs: performance.now() - started, usage, finalCharacters: last.length, stageEntries: stageEntries.length, deliveryPassed, requestsContinue: allText.some((t) => /shall I continue|是否继续|要我继续|可以继续吗/i.test(t)), prematureEnds: prematureEnds.length, finalPresent: !!last.trim(), requiredInputRequested: !test.blocked || (/(credential|凭据)/i.test(last) && /(provide|need|supply|missing|请提供|需要|缺少)/i.test(last)), falseCompletion: test.blocked && /(?:all stages completed|task (?:is )?complete|全部完成|任务已完成)/i.test(last) });
   } finally { clearTimeout(timer); session.dispose(); }
  }
  console.log(JSON.stringify({ protocol: "live-stage-probe/v1", provider: model.provider, model: model.id, scope: "Three controlled scenarios, current policy only; no old/new causal comparison", records }, null, 2));
- if (records.some((r) => !r.passed || !r.finalPresent || r.prematureEnds > 0 || !r.requiredInputRequested || r.falseCompletion || (!r.case.includes("input") && r.requestsContinue))) process.exitCode = 1;
+ if (records.some((r) => !r.passed || !r.deliveryPassed || !r.finalPresent || r.prematureEnds > 0 || !r.requiredInputRequested || r.falseCompletion || (!r.case.includes("input") && r.requestsContinue))) process.exitCode = 1;
 } finally { rmSync(cwd, { recursive: true, force: true }); }

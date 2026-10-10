@@ -112,6 +112,14 @@ try {
  assert.equal(queueOnce, false);
  assert.ok(providerFixtureCalls >= 4, "queued continuation reached the deterministic response stream");
  assert.equal(session.getLastAssistantText(), "Fixture reply; no completion claim.");
+ await session.reload();
+ const reloadedRunner = session.extensionRunner;
+ const reloadedContext = reloadedRunner.createContext();
+ const reloadedEvidence = reloadedRunner.getToolDefinition("talk_report_context");
+ const afterReload = await reloadedEvidence.execute("reload-probe", {}, undefined, undefined, reloadedContext);
+ assert.equal(afterReload.details.goal, "");
+ assert.equal(afterReload.details.evidence.length, 0, "reload invalidates ephemeral evidence rather than carrying stale scope");
+ assert.equal(reloadedRunner.getAllRegisteredTools().filter((t) => t.definition.name === "talk_report_brief").length, 1);
  assert.equal(errors.length, 0, errors.join("\n"));
  console.log("# Real Pi SDK lifecycle runner: passed (event replay + consecutive AgentSession loops + queued continuation; deterministic provider fixture, no network)");
 } finally { session.dispose(); }
