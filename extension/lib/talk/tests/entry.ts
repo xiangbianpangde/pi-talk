@@ -71,6 +71,10 @@ test("trigger: report scope preserves only requested summary and resets branch b
 	eq(settled?.cause, "settled");
 	scope.settle("a", false, true); eq(scope.current()?.id, settled?.id);
 	scope.settle("a", true, true); eq(scope.current(), undefined, "abort clears opportunity");
+	scope.requestSummary();
+	const beforeSummary = scope.scopeVersion();
+	eq(scope.start("a", true).preserveEvidence, true, "aborted task evidence can be summarized");
+	ok(scope.scopeVersion() > beforeSummary, "summary invalidates pending report version even with retained evidence");
 	eq(scope.start("a", true).preserveEvidence, false, "new task does not inherit previous summary request");
 	const exposed = scope.current(); if (exposed) exposed.taskId = "tampered";
 	ok(scope.current()?.taskId !== "tampered", "external copy cannot mutate internal task");

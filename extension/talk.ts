@@ -132,8 +132,9 @@ export default function (pi: ExtensionAPI) {
 		}),
 		async execute(_id, params, _signal, _onUpdate, ctx) {
 			const scopeVersion = information.scopeVersion();
+			const reportVersion = reportScope.scopeVersion();
 			return enqueueDelivery(async () => {
-			if (_signal?.aborted || scopeVersion !== information.scopeVersion()) {
+			if (_signal?.aborted || scopeVersion !== information.scopeVersion() || reportVersion !== reportScope.scopeVersion()) {
 				return { content: [{ type: "text", text: "Stage update cancelled: task scope changed or execution was aborted." }], details: { sent: false, reason: "stale-scope", continuation: "continue" } };
 			}
 			// A user-started task is not an explicit request for every stage update.

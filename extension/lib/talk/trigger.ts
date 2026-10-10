@@ -59,23 +59,33 @@ export function createReportScope() {
 	let sequence = 0;
 	let summarizePending = false;
 	let opportunity: ReportOpportunity | undefined;
+	let summaryAnchor: { branchId: string; taskId: string } | undefined;
+	let scopeVersion = 0;
 	return {
 		requestSummary(pending = true) { summarizePending = pending; },
 		start(branchId: string, hasGoal: boolean) {
-			const preserveEvidence = Boolean(summarizePending && hasGoal && opportunity?.branchId === branchId);
+			scopeVersion++;
+			const anchor = opportunity || summaryAnchor;
+			const preserveEvidence = Boolean(summarizePending && hasGoal && anchor?.branchId === branchId);
 			summarizePending = false;
 			router.reset();
-			opportunity = router.accept({ id: `prompt-${++sequence}`, taskId: `task-${sequence}`, branchId, cause: "explicit", explicitFormat: "text" });
+			opportunity = router.accept({ id: `prompt-${++sequence}`, taskId: preserveEvidence && anchor ? anchor.taskId : `task-${sequence}`, branchId, cause: "explicit", explicitFormat: "text" });
+			summaryAnchor = undefined;
 			return { preserveEvidence, opportunity: opportunity ? { ...opportunity } : undefined };
 		},
 		settle(branchId: string, aborted: boolean, hasGoal: boolean) {
 			if (!opportunity || opportunity.branchId !== branchId) return;
-			if (aborted || !hasGoal) { opportunity = undefined; return; }
+			if (aborted || !hasGoal) {
+				if (aborted) summaryAnchor = { branchId, taskId: opportunity.taskId };
+				opportunity = undefined;
+				return;
+			}
 			const settled = router.accept({ id: `settled-${sequence}`, taskId: opportunity.taskId, branchId, cause: "settled" });
 			if (settled) opportunity = settled;
 		},
 		current() { return opportunity ? { ...opportunity } : undefined; },
-		reset() { summarizePending = false; opportunity = undefined; router.reset(); },
+		scopeVersion() { return scopeVersion; },
+		reset() { summarizePending = false; opportunity = undefined; summaryAnchor = undefined; scopeVersion++; router.reset(); },
 	};
 }
 
