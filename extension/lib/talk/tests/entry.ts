@@ -61,6 +61,8 @@ test("isolation: session writes stay inside the disposable test home", () => {
 
 test("trigger: report scope preserves only requested summary and resets branch boundaries", () => {
 	const scope = createReportScope();
+	scope.settle("a", false, true);
+	eq(scope.current(), undefined, "settlement without a task cannot create task-0");
 	eq(scope.start("a", false).preserveEvidence, false);
 	scope.requestSummary();
 	eq(scope.start("a", true).preserveEvidence, true);
@@ -68,13 +70,18 @@ test("trigger: report scope preserves only requested summary and resets branch b
 	const settled = scope.current();
 	eq(settled?.cause, "settled");
 	scope.settle("a", false, true); eq(scope.current()?.id, settled?.id);
-	scope.settle("a", true, true); eq(scope.current()?.id, settled?.id);
+	scope.settle("a", true, true); eq(scope.current(), undefined, "abort clears opportunity");
 	eq(scope.start("a", true).preserveEvidence, false, "new task does not inherit previous summary request");
+	const exposed = scope.current(); if (exposed) exposed.taskId = "tampered";
+	ok(scope.current()?.taskId !== "tampered", "external copy cannot mutate internal task");
+	scope.settle("other-branch", false, true); ok(scope.current()?.branchId !== "other-branch");
 	scope.requestSummary(); scope.requestSummary(false);
 	eq(scope.start("a", true).preserveEvidence, false, "nonempty request clears unconsumed bare summary intent");
 	scope.requestSummary(); scope.reset();
 	eq(scope.current(), undefined);
 	eq(scope.start("b", true).preserveEvidence, false);
+	scope.requestSummary();
+	eq(scope.start("c", true).preserveEvidence, false, "summary cannot preserve evidence across branches");
 });
 
 test("trigger: opportunity replay deduplicates retries without claiming completion", () => {
@@ -135,6 +142,7 @@ test("trigger: lifecycle registration preserves event names and ordering", async
 	eq(calls.join(","), "reset,reset,stop");
 	lifecycle.dispose();
 	eq(hooks.size, 0, "dispose removes all registered lifecycle handlers");
+	lifecycle.registerSessionHooks(); eq(hooks.size, 0, "disposal is terminal");
 });
 
 test("trigger: lifecycle resets permit, stops in order and only appends while active", async () => {
@@ -692,7 +700,7 @@ test("extension: actual tool registration enforces target permit and rejects cro
 	ok(!rtBefore.server, "ordinary reports do not start a server");
 	eq([...hooks.keys()].join(","), "agent_start,session_shutdown,before_agent_start,tool_result,agent_settled,session_before_switch,session_before_fork,session_tree");
 	for (const name of ["talk_render", "talk_prepare_report", "talk_report_images", "talk_set_style", "talk_status"]) ok(tools.has(name));
-	for (const fn of hookLists.get("before_agent_start")!) await fn({ prompt: "verify feature", systemPrompt: "base" });
+	for (const fn of hookLists.get("before_agent_start")!) await fn({ prompt: "verify feature", systemPrompt: "base" }, { sessionManager: { getSessionId: () => "session" } });
 	await hooks.get("tool_result")({ toolName: "bash", toolCallId: "observed", content: [{ type: "text", text: "passed" }], isError: false });
 	const context = await tools.get("talk_report_context").execute();
 	eq(context.details.goal, "verify feature");
@@ -706,7 +714,7 @@ test("extension: actual tool registration enforces target permit and rejects cro
 	await hooks.get("agent_settled")({ aborted: false }, settledCtx);
 	eq((await tools.get("talk_report_context").execute()).details.opportunity.id, settledContext.opportunity.id);
 	await hooks.get("agent_settled")({ aborted: true }, settledCtx);
-	eq((await tools.get("talk_report_context").execute()).details.opportunity.id, settledContext.opportunity.id);
+	eq((await tools.get("talk_report_context").execute()).details.opportunity, undefined);
 	await hooks.get("session_before_fork")();
 	eq((await tools.get("talk_report_context").execute()).details.evidence.length, 0);
 	const rt = getRuntime();

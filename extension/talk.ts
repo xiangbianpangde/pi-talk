@@ -96,7 +96,7 @@ export default function (pi: ExtensionAPI) {
 	triggers.registerSessionHooks();
 	pi.on("before_agent_start", (event, ctx) => {
 		// /talk asks about the preceding task; do not erase its tool evidence.
-		const scope = reportScope.start(ctx?.sessionManager?.getLeafId() || ctx?.sessionManager?.getSessionId() || "current", !!information.context().goal);
+		const scope = reportScope.start(ctx?.sessionManager?.getSessionId() || "current", !!information.context().goal);
 		if (!scope.preserveEvidence) information.begin(event.prompt);
 		return { systemPrompt: event.systemPrompt + "\n\nOrdinary progress, reviews, audits and results: answer concisely in the MAIN transcript. Do not ask for a report format or call talk_prepare_report/talk_render unless the user explicitly requested a rich-media surface. Lead with status and consequential conclusions, then only decision-relevant evidence, unfinished work, limits and next actions. Omit routine process narration; do not force a template for simple tasks. A stage update is non-blocking commentary, never a reason to end the task or ask permission to continue. Continue authorized execution after updates. Never send a standalone milestone/next-step report merely because a phase, commit or test batch ended; fold it into the eventual result or suppress it. Report only a consequential result, changed risk/decision or true blocker; suppress unchanged status and commit/test-count chatter. Ask the user only for missing essential input, an actual scope change or an operation requiring authorization; do not ask again for already granted permission. Anchor conclusions to the task goal and observed evidence. Before executing task tools, use talk_task_requirements to anchor all acceptance criteria to user text. Use talk_report_brief to check important claims and map every criterion to evidence; its text is a draft for your answer, not independently verified truth. Distinguish partial/blocked/failed work. Graphs only when informative; HTML only when explicitly requested." };
 	});
@@ -105,7 +105,7 @@ export default function (pi: ExtensionAPI) {
 		information.collect(event.toolCallId, event.toolName, event.content.filter((c) => c.type === "text").map((c) => c.text).join("\n"), event.isError, createHash("sha256").update(JSON.stringify([event.toolName, event.input])).digest("hex"));
 	});
 	pi.on("agent_settled", (event, ctx) => {
-		reportScope.settle(ctx.sessionManager.getLeafId() || ctx.sessionManager.getSessionId(), event.aborted, !!information.context().goal);
+		reportScope.settle(ctx.sessionManager.getSessionId(), event.aborted, !!information.context().goal);
 	});
 	for (const event of ["session_before_switch", "session_before_fork", "session_tree"] as const) pi.on(event, () => { information.begin(""); reportScope.reset(); });
 

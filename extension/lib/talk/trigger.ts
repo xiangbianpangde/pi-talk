@@ -45,6 +45,8 @@ export function createOpportunityRouter() {
 			const key = JSON.stringify([event.branchId, event.taskId, event.id]);
 			if (seen.has(key)) return undefined;
 			seen.add(key);
+			// Bounded retry window, not durable exactly-once history.
+			if (seen.size > 256) seen.delete(seen.values().next().value!);
 			return { ...event };
 		},
 		reset() { seen.clear(); },
@@ -60,17 +62,19 @@ export function createReportScope() {
 	return {
 		requestSummary(pending = true) { summarizePending = pending; },
 		start(branchId: string, hasGoal: boolean) {
-			const preserveEvidence = summarizePending && hasGoal;
+			const preserveEvidence = summarizePending && hasGoal && opportunity?.branchId === branchId;
 			summarizePending = false;
+			router.reset();
 			opportunity = router.accept({ id: `prompt-${++sequence}`, taskId: `task-${sequence}`, branchId, cause: "explicit", explicitFormat: "text" });
-			return { preserveEvidence, opportunity };
+			return { preserveEvidence, opportunity: opportunity ? { ...opportunity } : undefined };
 		},
 		settle(branchId: string, aborted: boolean, hasGoal: boolean) {
-			if (aborted || !hasGoal) return;
-			const settled = router.accept({ id: `settled-${sequence}`, taskId: opportunity?.taskId || `task-${sequence}`, branchId, cause: "settled" });
+			if (aborted || !hasGoal) { opportunity = undefined; return; }
+			if (!opportunity || opportunity.branchId !== branchId) return;
+			const settled = router.accept({ id: `settled-${sequence}`, taskId: opportunity.taskId, branchId, cause: "settled" });
 			if (settled) opportunity = settled;
 		},
-		current() { return opportunity; },
+		current() { return opportunity ? { ...opportunity } : undefined; },
 		reset() { summarizePending = false; opportunity = undefined; router.reset(); },
 	};
 }
@@ -86,14 +90,15 @@ export function registerTalkLifecycle(pi: Pick<ExtensionAPI, "on">, deps: TalkTr
 	const handlers = createTalkTriggerHandlers(deps);
 	const dispose = [pi.on("agent_start", () => { handlers.agentStart(); })];
 	let registered = false;
+	let disposed = false;
 	return {
 		registerSessionHooks() {
-			if (registered) return;
+			if (registered || disposed) return;
 			registered = true;
 			dispose.push(pi.on("session_shutdown", () => handlers.sessionShutdown()));
 			dispose.push(pi.on("before_agent_start", (event) => handlers.beforeAgentStart(event)));
 		},
-		dispose() { for (const off of dispose.splice(0)) off?.(); },
+		dispose() { disposed = true; for (const off of dispose.splice(0)) off?.(); },
 	};
 }
 
