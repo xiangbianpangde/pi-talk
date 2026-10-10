@@ -123,7 +123,7 @@ test("trigger: start routing preserves explicit styles, non-TUI and cancelled pi
 test("trigger: lifecycle registration preserves event names and ordering", async () => {
 	const hooks = new Map<string, (...args: any[]) => any>();
 	const calls: string[] = [];
-	const lifecycle = registerTalkLifecycle({ on: (event, handler) => { hooks.set(event, handler); } }, {
+	const lifecycle = registerTalkLifecycle({ on: (event, handler) => { hooks.set(event, handler); return () => { hooks.delete(event); }; } }, {
 		resetPermit: () => calls.push("reset"), stop: async () => { calls.push("stop"); },
 		isActive: () => false, appendix: () => "",
 	});
@@ -133,6 +133,8 @@ test("trigger: lifecycle registration preserves event names and ordering", async
 	await hooks.get("agent_start")!({});
 	await hooks.get("session_shutdown")!({});
 	eq(calls.join(","), "reset,reset,stop");
+	lifecycle.dispose();
+	eq(hooks.size, 0, "dispose removes all registered lifecycle handlers");
 });
 
 test("trigger: lifecycle resets permit, stops in order and only appends while active", async () => {
