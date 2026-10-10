@@ -13,7 +13,7 @@ import { randomUUID } from "node:crypto";
 import registerTalk from "../../../talk";
 import { createTalkTriggerHandlers, parseTalkArgs, resolveTalkStart, registerTalkLifecycle, createOpportunityRouter } from "../trigger";
 import { createInformationEngine, briefText } from "../information";
-import { deliverBrief } from "../delivery";
+import { createDeliveryQueue, deliverBrief } from "../delivery";
 import { auditExplainContent } from "../explain-audit";
 import { parseExplanationPlan, validateExplanationPlan } from "../explain/validate";
 import { compileExplanation, plainText, renderMarkdownLite, thesisOf } from "../explain/render";
@@ -137,6 +137,22 @@ test("trigger: lifecycle resets permit, stops in order and only appends while ac
 	handlers.agentStart();
 	await handlers.sessionShutdown();
 	eq(calls.join(","), "reset,reset,stop");
+});
+
+test("delivery: concurrent operations serialize validation and survive failed sends", async () => {
+	const queue = createDeliveryQueue();
+	const engine = createInformationEngine(); engine.begin("goal");
+	let sent = 0;
+	const publish = () => queue(async () => {
+		const brief = engine.refine("partial", [{ text: "new risk", kind: "risk", status: "inferred", evidenceIds: [] }], false, [], {}, "outcome", false);
+		const result = await deliverBrief(brief, { publish: async () => { await Promise.resolve(); sent++; } });
+		if (result.sent) engine.markDelivered(brief);
+	});
+	await Promise.all([publish(), publish()]);
+	eq(sent, 1, "concurrent identical stages publish once");
+	try { await queue(async () => { throw new Error("failed"); }); } catch {}
+	let recovered = false; await queue(async () => { recovered = true; });
+	ok(recovered, "queue is not poisoned by failure");
 });
 
 test("delivery: failed publication and previews do not consume the delivery baseline", async () => {

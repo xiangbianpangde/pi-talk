@@ -112,6 +112,28 @@ try {
  assert.equal(queueOnce, false);
  assert.ok(providerFixtureCalls >= 4, "queued continuation reached the deterministic response stream");
  assert.equal(session.getLastAssistantText(), "Fixture reply; no completion claim.");
+ // Abort an actual pending provider stream, then recover with another prompt.
+ const normalStream = session.agent.streamFunction;
+ let enteredStream;
+ const entered = new Promise((resolve) => { enteredStream = resolve; });
+ session.agent.streamFunction = (_model, _context, options) => {
+  const stream = createAssistantMessageEventStream();
+  const message = { role: "assistant", content: [], api: fixtureModel.api, provider: fixtureModel.provider, model: fixtureModel.id, stopReason: "aborted", timestamp: Date.now(), usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } } };
+  options.signal.addEventListener("abort", () => stream.push({ type: "error", reason: "aborted", error: message }), { once: true });
+  enteredStream();
+  return stream;
+ };
+ const pendingPrompt = session.prompt("Task to abort");
+ await entered;
+ await session.abort();
+ await pendingPrompt;
+ const abortedState = await evidenceTool.execute("abort-probe", {}, undefined, undefined, runner.createContext());
+ assert.notEqual(abortedState.details.opportunity?.cause, "settled", "aborted task is not settled reporting opportunity");
+ session.agent.streamFunction = normalStream;
+ await session.prompt("Recovery after abort");
+ const recovered = await evidenceTool.execute("recovery-probe", {}, undefined, undefined, runner.createContext());
+ assert.equal(recovered.details.goal, "Recovery after abort");
+ assert.equal(recovered.details.opportunity.cause, "settled");
  await session.reload();
  const reloadedRunner = session.extensionRunner;
  const reloadedContext = reloadedRunner.createContext();

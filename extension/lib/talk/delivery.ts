@@ -10,6 +10,16 @@ export interface DeliveryResult {
 	continuation: "continue";
 }
 
+/** Serialize validation + publication + baseline update, including concurrent tool calls. */
+export function createDeliveryQueue() {
+	let tail: Promise<unknown> = Promise.resolve();
+	return function enqueue<T>(operation: () => Promise<T>): Promise<T> {
+		const next = tail.then(operation);
+		tail = next.catch(() => {});
+		return next;
+	};
+}
+
 /** Single main-transcript delivery boundary. Rendering and authorization never belong here. */
 export async function deliverBrief(
 	brief: Brief,

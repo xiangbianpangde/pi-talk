@@ -6,7 +6,7 @@
  */
 import { createHash } from "node:crypto";
 import { createInformationEngine, briefText } from "./lib/talk/information";
-import { deliverBrief } from "./lib/talk/delivery";
+import { createDeliveryQueue, deliverBrief } from "./lib/talk/delivery";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import {
@@ -78,6 +78,7 @@ async function pickStyle(ctx: { ui: { select: Function } }, runtime = getRuntime
 export default function (pi: ExtensionAPI) {
 	const runtime = getRuntime();
 	const information = createInformationEngine();
+	const enqueueDelivery = createDeliveryQueue();
 	const opportunities = createOpportunityRouter();
 	let opportunity: ReportOpportunity | undefined;
 	let sequence = 0;
@@ -143,11 +144,13 @@ export default function (pi: ExtensionAPI) {
 			claims: Type.Array(Type.Object({ text: Type.String(), kind: Type.Union([Type.Literal("result"), Type.Literal("risk"), Type.Literal("blocker"), Type.Literal("decision")]), status: Type.Union([Type.Literal("observed"), Type.Literal("inferred"), Type.Literal("unverified")]), evidenceIds: Type.Array(Type.String()) })),
 		}),
 		async execute(_id, params, _signal, _onUpdate, ctx) {
+			return enqueueDelivery(async () => {
 			const explicit = params.explicit ?? opportunity?.cause === "explicit";
 			const brief = information.refine(params.state, params.claims, explicit, params.acceptanceEvidenceIds, { checks: params.checks, resolutions: params.resolutions }, params.updatePurpose, false);
 			const delivery = params.publish ? await deliverBrief(brief, { publish: (content) => pi.sendMessage({ customType: "talk-stage-update", content, display: true, details: { state: brief.state, continuation: "continue" } }, { triggerTurn: false }) }, { explicit }) : undefined;
 			if (delivery?.sent) information.markDelivered(brief);
 			return { content: [{ type: "text", text: briefText(brief) || "No material update delivered; continue the authorized task." }], details: { ...brief, delivery } };
+			});
 		},
 	});
 
