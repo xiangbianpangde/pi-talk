@@ -6,7 +6,7 @@ import { pathToFileURL } from "node:url";
 assert.equal(homedir(), process.env.TALK_TEST_HOME, "Use the isolated runner");
 const pkg = process.env.PI_CODING_AGENT_PACKAGE;
 assert.ok(pkg, "Set PI_CODING_AGENT_PACKAGE to the installed Pi package directory");
-const { createAgentSession, DefaultResourceLoader, SettingsManager, SessionManager } = await import(pathToFileURL(join(pkg, "dist", "index.js")).href);
+const { createAgentSession, DefaultResourceLoader, SettingsManager, SessionManager, createAgentSessionRuntime, createAgentSessionServices, createAgentSessionFromServices } = await import(pathToFileURL(join(pkg, "dist", "index.js")).href);
 const settingsManager = SettingsManager.inMemory({ defaultTools: [] });
 let registered = false;
 const loader = new DefaultResourceLoader({ cwd: process.cwd(), agentDir: join(homedir(), ".pi", "agent"), settingsManager,
@@ -123,3 +123,34 @@ try {
  assert.equal(errors.length, 0, errors.join("\n"));
  console.log("# Real Pi SDK lifecycle runner: passed (event replay + consecutive AgentSession loops + queued continuation; deterministic provider fixture, no network)");
 } finally { session.dispose(); }
+
+// Actual replacement/resume uses file-backed synthetic history inside isolated HOME.
+const sessionDir = join(homedir(), "runtime-sessions");
+const initialManager = SessionManager.create(process.cwd(), sessionDir);
+initialManager.appendMessage({ role: "user", content: [{ type: "text", text: "Synthetic persisted task" }], timestamp: Date.now() });
+const originalPath = initialManager.getSessionFile();
+const runtime = await createAgentSessionRuntime(async ({ cwd, agentDir, sessionManager, sessionStartEvent }) => {
+ const services = await createAgentSessionServices({ cwd, agentDir, settingsManager: SettingsManager.inMemory({ defaultTools: [] }), resourceLoaderOptions: { noExtensions: true, noSkills: true, noPromptTemplates: true, noThemes: true, additionalExtensionPaths: [process.env.TALK_SDK_EXTENSION] } });
+ assert.equal(services.resourceLoader.getExtensions().errors.length, 0);
+ return { ...(await createAgentSessionFromServices({ services, sessionManager, sessionStartEvent, noTools: "builtin" })), services, diagnostics: services.diagnostics };
+}, { cwd: process.cwd(), agentDir: join(homedir(), ".pi", "agent"), sessionManager: initialManager });
+const readState = async () => {
+ await runtime.session.bindExtensions({});
+ const runner = runtime.session.extensionRunner;
+ return runner.getToolDefinition("talk_report_context").execute("replacement-probe", {}, undefined, undefined, runner.createContext());
+};
+try {
+ await readState();
+ await runtime.session.extensionRunner.emitBeforeAgentStart("Old task", undefined, { customPrompt: "test", cwd: process.cwd() });
+ const oldSession = runtime.session;
+ const changed = await runtime.newSession();
+ assert.equal(changed.cancelled, false);
+ assert.notEqual(runtime.session, oldSession);
+ assert.equal((await readState()).details.goal, "");
+ assert.ok(originalPath);
+ const resumed = await runtime.switchSession(originalPath);
+ assert.equal(resumed.cancelled, false);
+ assert.equal((await readState()).details.evidence.length, 0);
+ assert.ok(runtime.session.messages.some((m) => m.role === "user"));
+ console.log("# Real Pi runtime replacement/resume: passed (synthetic persisted history, no provider)");
+} finally { await runtime.dispose(); }
