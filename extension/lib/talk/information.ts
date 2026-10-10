@@ -36,8 +36,9 @@ export function createInformationEngine() {
 	let requirements: Requirement[] = [];
 	let goalIncomplete = false;
 	let droppedFailure = false;
+	let scopeVersion = 0;
 	return {
-		begin(prompt: string) { goal = prompt.slice(0, 6000); evidence = []; requirements = []; goalIncomplete = prompt.length > 6000; incomplete = goalIncomplete; droppedFailure = false; previous = ""; },
+		begin(prompt: string) { scopeVersion++; goal = prompt.slice(0, 6000); evidence = []; requirements = []; goalIncomplete = prompt.length > 6000; incomplete = goalIncomplete; droppedFailure = false; previous = ""; },
 		/** Producer-authored decomposition, anchored to literal user text, not independently verified coverage. */
 		defineRequirements(items: Requirement[]) {
 			if (requirements.length) throw new Error("Requirements are immutable in this task scope; a changed user scope requires a new task.");
@@ -60,6 +61,7 @@ export function createInformationEngine() {
 				incomplete = true;
 			}
 		},
+		scopeVersion() { return scopeVersion; },
 		markDelivered(brief: Brief) { previous = fingerprint(JSON.stringify({ state: brief.state, claims: brief.claims })); },
 		context() { return { goal, requirements: requirements.map((r) => ({ ...r })), evidence: evidence.map((e) => ({ ...e })), incomplete, goalIncomplete, droppedFailure }; },
 		refine(state: TaskState, candidates: Claim[], explicit = true, acceptanceEvidenceIds: string[] = [], mapping: AcceptanceMap = {}, updatePurpose: "outcome" | "routine" = "outcome", recordBaseline = true): Brief {

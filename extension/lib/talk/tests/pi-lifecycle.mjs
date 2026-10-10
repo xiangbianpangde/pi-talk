@@ -61,6 +61,10 @@ try {
  assert.equal(routine.details.delivery.sent, false);
  assert.equal(routine.details.continuation, "continue");
  assert.equal(stageEntries().length, 2, "routine stage creates no actual transcript entry");
+ const controller = new AbortController(); controller.abort();
+ const abortedDelivery = await briefTool.execute("aborted-delivery", { ...params, explicit: true }, controller.signal, undefined, ctx);
+ assert.equal(abortedDelivery.details.reason, "stale-scope");
+ assert.equal(stageEntries().length, 2, "aborted delivery creates no transcript entry");
  await runner.emit({ type: "agent_settled", aborted: false });
  await runner.emit({ type: "agent_settled", aborted: true });
  await runner.emit({ type: "session_before_switch", sessionPath: "memory" });

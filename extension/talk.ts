@@ -144,7 +144,11 @@ export default function (pi: ExtensionAPI) {
 			claims: Type.Array(Type.Object({ text: Type.String(), kind: Type.Union([Type.Literal("result"), Type.Literal("risk"), Type.Literal("blocker"), Type.Literal("decision")]), status: Type.Union([Type.Literal("observed"), Type.Literal("inferred"), Type.Literal("unverified")]), evidenceIds: Type.Array(Type.String()) })),
 		}),
 		async execute(_id, params, _signal, _onUpdate, ctx) {
+			const scopeVersion = information.scopeVersion();
 			return enqueueDelivery(async () => {
+			if (_signal?.aborted || scopeVersion !== information.scopeVersion()) {
+				return { content: [{ type: "text", text: "Stage update cancelled: task scope changed or execution was aborted." }], details: { sent: false, reason: "stale-scope", continuation: "continue" } };
+			}
 			// A user-started task is not an explicit request for every stage update.
 			const explicit = params.explicit === true;
 			const brief = information.refine(params.state, params.claims, explicit, params.acceptanceEvidenceIds, { checks: params.checks, resolutions: params.resolutions }, params.updatePurpose, false);
