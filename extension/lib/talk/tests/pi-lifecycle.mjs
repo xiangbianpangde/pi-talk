@@ -88,7 +88,12 @@ try {
  assert.equal(stageEntries().length, 2, "aborted delivery creates no transcript entry");
  await runner.emit({ type: "agent_settled", aborted: false });
  await runner.emit({ type: "agent_settled", aborted: true });
- await runner.emit({ type: "session_before_switch", sessionPath: "memory" });
+ const queuedStale = briefTool.execute("queued-stale", { ...params, explicit: true }, undefined, undefined, ctx);
+ const switchOperation = runner.emit({ type: "session_before_switch", sessionPath: "memory" });
+ await switchOperation;
+ const staleResult = await queuedStale;
+ assert.equal(staleResult.details.reason, "stale-scope", "queued delivery captured old scope and is rejected on switch");
+ assert.equal(stageEntries().length, 2, "stale queue does not append to new scope");
  const switched = await evidenceTool.execute("probe", {}, undefined, undefined, ctx);
  assert.equal(switched.details.goal, "");
  await runner.emit({ type: "session_before_fork", entryId: "test" });
