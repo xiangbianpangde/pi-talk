@@ -189,7 +189,7 @@ test("delivery: concurrent operations serialize validation and survive failed se
 	const publish = () => queue(async () => {
 		const brief = engine.refine("partial", [{ text: "new risk", kind: "risk", status: "inferred", evidenceIds: [] }], false, [], {}, "outcome", false);
 		const result = await deliverBrief(brief, { publish: async () => { await Promise.resolve(); sent++; } });
-		if (result.sent) engine.markDelivered(brief);
+		if (result.sent) engine.markDelivered(brief, engine.scopeVersion(), { sent: true });
 	});
 	await Promise.all([publish(), publish()]);
 	eq(sent, 1, "concurrent identical stages publish once");
@@ -208,7 +208,7 @@ test("delivery: failed publication and previews do not consume the delivery base
 	eq(draft().delivery, "send", "failed transport remains retryable");
 	const brief = draft();
 	const result = await deliverBrief(brief, { publish: () => {} });
-	if (result.sent) engine.markDelivered(brief);
+	if (result.sent) engine.markDelivered(brief, engine.scopeVersion(), { sent: true });
 	eq(draft().delivery, "suppress", "only successfully published content becomes baseline");
 });
 
@@ -240,9 +240,12 @@ test("information: operators, unrelated criteria, redaction and stale baseline f
 	engine.collect("secret", "tool", 'Authorization: Bearer abc123\npassword="space secret"', false);
 	const secret = engine.context().evidence.find((e) => e.id === "secret")!.text;
 	ok(!secret.includes("abc123") && !secret.includes("space secret"));
+	engine.collect("json", "Authorization: Bearer leaked", '{"password":"secret"}', false);
+	const jsonSecret = engine.context().evidence.find((e) => e.id === "json")!;
+	ok(!jsonSecret.text.includes("secret") && !jsonSecret.locator.includes("leaked"));
 	const version = engine.scopeVersion();
 	engine.begin("new task");
-	eq(engine.markDelivered(unrelated, version), false, "in-flight old delivery cannot pollute new baseline");
+	eq(engine.markDelivered(unrelated, version, { sent: true }), false, "in-flight old delivery cannot pollute new baseline");
 });
 
 test("information: shadow scenarios preserve decisions, reject fabricated claims and reset scope", () => {
@@ -296,7 +299,9 @@ test("information: new evidence and risk identity cannot be deduplicated as unch
 	engine.collect("first", "check 1", "deployment pending", false);
 	engine.collect("second", "check 2", "deployment pending", false);
 	const result = { text: "deployment pending", kind: "result" as const, status: "observed" as const, evidenceIds: ["first"] };
-	eq(engine.refine("partial", [result], false).delivery, "send");
+	const sentBrief = engine.refine("partial", [result], false);
+	eq(sentBrief.delivery, "send");
+	engine.markDelivered(sentBrief, engine.scopeVersion(), { sent: true });
 	eq(engine.refine("partial", [result], false).delivery, "suppress");
 	eq(engine.refine("partial", [{ ...result, evidenceIds: ["second"] }], false).delivery, "send");
 	const risk = { ...result, kind: "risk" as const, evidenceIds: ["second"] };
@@ -364,7 +369,8 @@ test("information: shadow matrix covers completed, partial, failed, blocked, unc
 	const unchanged = createInformationEngine(); unchanged.begin("goal");
 	unchanged.collect("ok", "fixture", "same", false);
 	const candidate = [{ text: "same", kind: "result" as const, status: "observed" as const, evidenceIds: ["ok"] }];
-	unchanged.refine("partial", candidate, false);
+	const initialBrief = unchanged.refine("partial", candidate, false);
+	unchanged.markDelivered(initialBrief, unchanged.scopeVersion(), { sent: true });
 	eq(unchanged.refine("partial", candidate, false).delivery, "suppress");
 	ok((unchanged.refine("blocked", [{ text: "new blocker", kind: "blocker", status: "inferred", evidenceIds: [] }], false).claims[0].value ?? 0) > 0);
 	const empty = unchanged.refine("unknown", [], false);
@@ -394,6 +400,7 @@ test("information: evidence is bounded, redacted, traceable and completion is no
 	eq(brief.state, "partial");
 	ok(brief.claims.some((c) => c.kind === "risk"));
 	ok(briefText(brief).includes("partial"));
+	engine.markDelivered(brief, engine.scopeVersion(), { sent: true });
 	const same = engine.refine("partial", brief.claims, false);
 	eq(same.delivery, "suppress");
 });

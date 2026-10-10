@@ -53,6 +53,8 @@ for (const file of files) {
 		// No acceptance requirements were registered historically: completion MUST NOT be invented.
 		const candidates = context.evidence.filter((e) => e.failed).map((e) => ({ text: `Tool failure: ${e.locator}`, kind: "risk" as const, status: "unverified" as const, evidenceIds: [e.id] }));
 		const automatic = engine.refine("partial", candidates, false);
+		// Simulate an acknowledged publication for this structural replay only.
+		if (automatic.delivery === "send") engine.markDelivered(automatic, engine.scopeVersion(), { sent: true });
 		const repeat = engine.refine("partial", candidates, false);
 		const explicit = engine.refine("partial", candidates, true);
 		samples.push({ case: `H${String(samples.length + 1).padStart(2, "0")}`, fingerprint: taskFingerprint.slice(0, 12), toolResults: task.tools.length, failures: task.tools.filter((t) => t.isError).length, retainedFailures: context.evidence.filter((e) => e.failed).length, droppedFailure: context.droppedFailure, truncatedRecords: context.evidence.filter((e) => e.truncated).length, contextIncomplete: context.incomplete, historicalReplyCharacters: text(task.final.content).length, evidenceContextCharacters: JSON.stringify(context).length, historicalFinalDurationMs: task.final.durationMs ?? null, historicalUsage: task.final.usage ? { input: task.final.usage.input, output: task.final.usage.output } : null, replayMs: performance.now() - start, fabricatedCompletionRejected: brief.state !== "completed", unchangedSuppressed: repeat.delivery === "suppress", explicitSent: explicit.delivery === "send", automaticRiskCount: automatic.claims.filter((c) => c.kind === "risk").length });

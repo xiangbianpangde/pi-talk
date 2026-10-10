@@ -8,22 +8,14 @@ export interface FailureResolution { failureId: string; verificationId: string }
 export interface AcceptanceMap { checks?: RequirementCheck[]; resolutions?: FailureResolution[] }
 export interface Claim { text: string; kind: "result" | "risk" | "blocker" | "decision"; status: "observed" | "inferred" | "unverified"; evidenceIds: string[]; value?: number }
 export interface Brief { state: TaskState; claims: Claim[]; delivery: "send" | "suppress"; warnings: string[]; reason?: "explicit" | "material-change" | "unchanged" | "insufficient-evidence"; continuation: "continue" }
-const STOPWORDS = new Set(["a", "an", "the", "已", "已完成", "完成", "的", "了", "并", "且"]);
-const tokens = (value: string) => value.toLowerCase().match(/[a-z0-9]+|[\u4e00-\u9fff]+/g) || [];
-const meaningful = (value: string) => tokens(value).filter((t) => !STOPWORDS.has(t));
-const numbers = (value: string) => (value.match(/\d+(?:\.\d+)?/g) || []).sort();
 function supportsClaim(claim: string, evidence: string): boolean {
-	if (/[<>]=?|[!=]=?|\?/.test(claim) || /[<>]=?|[!=]=?|\?/.test(evidence)) return evidence.trim().toLowerCase() === claim.trim().toLowerCase();
-	if (evidence.trim().toLowerCase() === claim.trim().toLowerCase()) return true;
-	const claimNumbers = numbers(claim), evidenceNumbers = numbers(evidence);
-	if (claimNumbers.some((n) => !evidenceNumbers.includes(n))) return false;
-	const negation = /\b(?:not|never|without|failed|error|no)\b|不|未|无|没有|失败|错误/.test(claim.toLowerCase());
-	const evidenceNegation = /\b(?:not|never|without|failed|error|no)\b|不|未|无|没有|失败|错误/.test(evidence.toLowerCase());
-	if (negation !== evidenceNegation) return false;
-	// Token presence across a log is not entailment. Permit only the same ordered
-	// tokens after removing harmless quantity articles; never reorder or subset.
-	const wanted = meaningful(claim), available = meaningful(evidence);
-	return wanted.length > 0 && JSON.stringify(wanted) === JSON.stringify(available);
+	// No token-equivalence fallback: punctuation, units, bounds and qualifiers
+	// carry meaning. Semantic paraphrases belong to inferred, not observed.
+	return !!claim.trim() && claim.trim() === evidence.trim();
+}
+function redact(value: string): string {
+	return value
+		.replace(/(["']?(?:authorization|api[_-]?key|password|token)["']?\s*[:=]\s*)(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|(?:bearer|basic)\s+[^\r\n,}]+|[^\s,;}]+)/gi, "$1[redacted]");
 }
 const fingerprint = (value: string) => createHash("sha256").update(value).digest("hex");
 
@@ -39,7 +31,7 @@ export function createInformationEngine() {
 	let droppedFailure = false;
 	let scopeVersion = 0;
 	return {
-		begin(prompt: string) { scopeVersion++; goal = prompt.slice(0, 6000); evidence = []; requirements = []; goalIncomplete = prompt.length > 6000; incomplete = goalIncomplete; droppedFailure = false; previous = ""; },
+		begin(prompt: string) { scopeVersion++; goal = redact(prompt).slice(0, 6000); evidence = []; requirements = []; goalIncomplete = prompt.length > 6000; incomplete = goalIncomplete; droppedFailure = false; previous = ""; },
 		/** Producer-authored decomposition, anchored to literal user text, not independently verified coverage. */
 		defineRequirements(items: Requirement[]) {
 			if (requirements.length) throw new Error("Requirements are immutable in this task scope; a changed user scope requires a new task.");
@@ -52,11 +44,9 @@ export function createInformationEngine() {
 		collect(id: string, locator: string, text: string, failed: boolean, checkKey?: string) {
 			if (!goal || evidence.some((e) => e.id === id)) return;
 			// Bound context and redact common credentials before exposing it to the producer.
-			const safe = text
-				.replace(/(authorization)\s*:\s*(?:bearer|basic)\s+[^\r\n]+/gi, "$1: [redacted]")
-				.replace(/(api[_-]?key|password|token)\s*[:=]\s*(?:"[^"]*"|'[^']*'|[^\s,;]+)/gi, "$1=[redacted]");
+			const safe = redact(text);
 			if (safe.length > 3000) incomplete = true;
-			evidence.push({ id, locator, text: safe.slice(0, 3000), failed, observedAt: Date.now(), checkKey, truncated: safe.length > 3000 });
+			evidence.push({ id, locator: redact(locator), text: safe.slice(0, 3000), failed, observedAt: Date.now(), checkKey, truncated: safe.length > 3000 });
 			if (evidence.length > 24) {
 				const index = evidence.findIndex((e) => !e.failed);
 				const removed = evidence.splice(index < 0 ? 0 : index, 1)[0];
@@ -65,9 +55,9 @@ export function createInformationEngine() {
 			}
 		},
 		scopeVersion() { return scopeVersion; },
-		markDelivered(brief: Brief, expectedScope = scopeVersion) { if (expectedScope !== scopeVersion) return false; previous = fingerprint(JSON.stringify({ state: brief.state, claims: brief.claims })); return true; },
+		markDelivered(brief: Brief, expectedScope: number, receipt: { sent: true }) { if (expectedScope !== scopeVersion || brief.delivery === "suppress" || !receipt.sent) return false; previous = fingerprint(JSON.stringify({ state: brief.state, claims: brief.claims })); return true; },
 		context() { return { goal, requirements: requirements.map((r) => ({ ...r })), evidence: evidence.map((e) => ({ ...e })), incomplete, goalIncomplete, droppedFailure }; },
-		refine(state: TaskState, candidates: Claim[], explicit = true, acceptanceEvidenceIds: string[] = [], mapping: AcceptanceMap = {}, updatePurpose: "outcome" | "routine" = "outcome", recordBaseline = true): Brief {
+		refine(state: TaskState, candidates: Claim[], explicit = true, acceptanceEvidenceIds: string[] = [], mapping: AcceptanceMap = {}, updatePurpose: "outcome" | "routine" = "outcome", recordBaseline = false): Brief {
 			const warnings: string[] = [];
 			const known = new Map(evidence.map((e) => [e.id, e]));
 			const seen = new Set<string>();
