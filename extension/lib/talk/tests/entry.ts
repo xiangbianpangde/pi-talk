@@ -253,6 +253,9 @@ test("information: operators, unrelated criteria, redaction and stale baseline f
 	engine.collect("json", "Authorization: Bearer leaked", '{"password":"secret"}', false);
 	const jsonSecret = engine.context().evidence.find((e) => e.id === "json")!;
 	ok(!jsonSecret.text.includes("secret") && !jsonSecret.locator.includes("leaked"));
+	const nearLimit = "x".repeat(5987) + " token=x";
+	engine.begin(nearLimit);
+	eq(engine.context().goalIncomplete, true, "redaction expansion cannot hide goal truncation");
 	const version = engine.scopeVersion();
 	engine.begin("new task");
 	eq(engine.markDelivered(unrelated, version, { sent: true }), false, "in-flight old delivery cannot pollute new baseline");
@@ -362,7 +365,7 @@ test("information: failure repair and full requirement coverage govern completio
 	eq(e.refine("completed", claims, true, ["pass-a", "pass-b"], { checks, resolutions: [{ failureId: "bad", verificationId: "pass-b" }] }).state, "partial");
 });
 
-test("information: shadow matrix covers completed, partial, failed, blocked, unchanged and decision cases", () => {
+test("information: shadow matrix covers completed, partial, failed, blocked, unchanged and decision cases", async () => {
 	const cases = [
 		{ state: "completed" as const, claims: [{ text: "build passed", kind: "result" as const, status: "observed" as const, evidenceIds: ["ok"] }], expected: "completed" },
 		{ state: "partial" as const, claims: [{ text: "one item remains", kind: "risk" as const, status: "inferred" as const, evidenceIds: ["todo"] }], expected: "partial" },
@@ -383,6 +386,10 @@ test("information: shadow matrix covers completed, partial, failed, blocked, unc
 	unchanged.markDelivered(initialBrief, unchanged.scopeVersion(), { sent: true });
 	eq(unchanged.refine("partial", candidate, false).delivery, "suppress");
 	ok((unchanged.refine("blocked", [{ text: "new blocker", kind: "blocker", status: "inferred", evidenceIds: [] }], false).claims[0].value ?? 0) > 0);
+	const explicitSuppressed = unchanged.refine("partial", candidate, false);
+	const explicitSent = await deliverBrief(explicitSuppressed, { publish: () => {} }, { explicit: true });
+	ok(explicitSent.sent);
+	ok(unchanged.markDelivered(explicitSuppressed, unchanged.scopeVersion(), { sent: true }));
 	const empty = unchanged.refine("unknown", [], false);
 	eq(empty.delivery, "suppress", "empty automatic stage update is suppressed");
 	eq(empty.reason, "insufficient-evidence");
