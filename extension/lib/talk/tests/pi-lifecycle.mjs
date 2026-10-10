@@ -221,6 +221,7 @@ try {
  await session.waitForIdle(); unsubscribeCompact();
  assert.ok(autoCompactions >= 1, "actual threshold scheduler compacted before final settlement");
  assert.equal(compactAttempts, 2, "queued continuation ran after automatic compaction");
+ for (const marker of ["queued", "threshold-start", "threshold-end", "stream-2"]) assert.ok(compactTrace.includes(marker), JSON.stringify(compactTrace));
  assert.ok(compactTrace.indexOf("queued") < compactTrace.indexOf("threshold-start"), JSON.stringify(compactTrace));
  assert.ok(compactTrace.indexOf("threshold-start") < compactTrace.indexOf("threshold-end"), JSON.stringify(compactTrace));
  assert.ok(compactTrace.indexOf("threshold-end") < compactTrace.indexOf("stream-2"), JSON.stringify(compactTrace));
