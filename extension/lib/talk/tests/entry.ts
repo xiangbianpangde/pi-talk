@@ -139,6 +139,20 @@ test("trigger: lifecycle resets permit, stops in order and only appends while ac
 	eq(calls.join(","), "reset,reset,stop");
 });
 
+test("delivery: failed publication and previews do not consume the delivery baseline", async () => {
+	const engine = createInformationEngine(); engine.begin("goal");
+	const claims = [{ text: "new risk", kind: "risk" as const, status: "inferred" as const, evidenceIds: [] }];
+	const draft = () => engine.refine("partial", claims, false, [], {}, "outcome", false);
+	let failed = false;
+	try { await deliverBrief(draft(), { publish: () => { throw new Error("transport unavailable"); } }); } catch { failed = true; }
+	ok(failed);
+	eq(draft().delivery, "send", "failed transport remains retryable");
+	const brief = draft();
+	const result = await deliverBrief(brief, { publish: () => {} });
+	if (result.sent) engine.markDelivered(brief);
+	eq(draft().delivery, "suppress", "only successfully published content becomes baseline");
+});
+
 test("delivery: routine suppression, material send and explicit override share one boundary", async () => {
 	const sent: string[] = [];
 	const target = { publish: async (content: string) => { sent.push(content); } };

@@ -60,8 +60,9 @@ export function createInformationEngine() {
 				incomplete = true;
 			}
 		},
+		markDelivered(brief: Brief) { previous = fingerprint(JSON.stringify({ state: brief.state, claims: brief.claims })); },
 		context() { return { goal, requirements: requirements.map((r) => ({ ...r })), evidence: evidence.map((e) => ({ ...e })), incomplete, goalIncomplete, droppedFailure }; },
-		refine(state: TaskState, candidates: Claim[], explicit = true, acceptanceEvidenceIds: string[] = [], mapping: AcceptanceMap = {}, updatePurpose: "outcome" | "routine" = "outcome"): Brief {
+		refine(state: TaskState, candidates: Claim[], explicit = true, acceptanceEvidenceIds: string[] = [], mapping: AcceptanceMap = {}, updatePurpose: "outcome" | "routine" = "outcome", recordBaseline = true): Brief {
 			const warnings: string[] = [];
 			const known = new Map(evidence.map((e) => [e.id, e]));
 			const seen = new Set<string>();
@@ -114,7 +115,7 @@ export function createInformationEngine() {
 			const delivery = !explicit && (unchanged || state === "unknown" || !claims.length || processOnly) ? "suppress" : "send";
 			if (processOnly) warnings.push("Stage-only update suppressed; continue the authorized task without asking the user.");
 			// Suppressed routine drafts are not a delivered baseline.
-			if (delivery === "send") previous = current;
+			if (delivery === "send" && recordBaseline) previous = current;
 			const reason = explicit ? "explicit" : unchanged || processOnly ? "unchanged" : state === "unknown" || !claims.length ? "insufficient-evidence" : "material-change";
 			// A blocker may have agent-resolvable alternatives. This draft cannot grant
 			// permission to stop or infer that the user must act.

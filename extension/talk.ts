@@ -144,8 +144,9 @@ export default function (pi: ExtensionAPI) {
 		}),
 		async execute(_id, params, _signal, _onUpdate, ctx) {
 			const explicit = params.explicit ?? opportunity?.cause === "explicit";
-			const brief = information.refine(params.state, params.claims, explicit, params.acceptanceEvidenceIds, { checks: params.checks, resolutions: params.resolutions }, params.updatePurpose);
+			const brief = information.refine(params.state, params.claims, explicit, params.acceptanceEvidenceIds, { checks: params.checks, resolutions: params.resolutions }, params.updatePurpose, false);
 			const delivery = params.publish ? await deliverBrief(brief, { publish: (content) => pi.sendMessage({ customType: "talk-stage-update", content, display: true, details: { state: brief.state, continuation: "continue" } }, { triggerTurn: false }) }, { explicit }) : undefined;
+			if (delivery?.sent) information.markDelivered(brief);
 			return { content: [{ type: "text", text: briefText(brief) || "No material update delivered; continue the authorized task." }], details: { ...brief, delivery } };
 		},
 	});

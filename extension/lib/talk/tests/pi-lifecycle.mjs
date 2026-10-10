@@ -43,6 +43,8 @@ try {
  const settled = await evidenceTool.execute("probe", {}, undefined, undefined, ctx);
  assert.equal(settled.details.opportunity.cause, "settled");
  const params = { state: "partial", claims: [{ text: "passed", kind: "risk", status: "observed", evidenceIds: ["real-runner"] }], explicit: false, publish: true };
+ const preview = await briefTool.execute("preview", { ...params, publish: false }, undefined, undefined, ctx);
+ assert.equal(preview.details.delivery, undefined);
  const published = await briefTool.execute("publish", params, undefined, undefined, ctx);
  assert.equal(published.details.delivery.sent, true);
  const stageEntries = () => ctx.sessionManager.getEntries().filter((e) => e.type === "custom_message" && e.customType === "talk-stage-update");
