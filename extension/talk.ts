@@ -358,7 +358,7 @@ export default function (pi: ExtensionAPI) {
 
 			// Bare/message-only /talk is a main-transcript request: no session/server/picker.
 			if (!sub || !getStyleById(rt.styles, sub)) {
-				if (!args.trim()) reportScope.requestSummary();
+				reportScope.requestSummary(!args.trim());
 				await pi.sendUserMessage(args.trim() || "Summarize the current task in the main conversation: important outcomes, evidence, risks and decisions. No format selection or automatic HTML.");
 				return;
 			}

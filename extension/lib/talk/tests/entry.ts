@@ -70,6 +70,8 @@ test("trigger: report scope preserves only requested summary and resets branch b
 	scope.settle("a", false, true); eq(scope.current()?.id, settled?.id);
 	scope.settle("a", true, true); eq(scope.current()?.id, settled?.id);
 	eq(scope.start("a", true).preserveEvidence, false, "new task does not inherit previous summary request");
+	scope.requestSummary(); scope.requestSummary(false);
+	eq(scope.start("a", true).preserveEvidence, false, "nonempty request clears unconsumed bare summary intent");
 	scope.requestSummary(); scope.reset();
 	eq(scope.current(), undefined);
 	eq(scope.start("b", true).preserveEvidence, false);

@@ -58,7 +58,7 @@ export function createReportScope() {
 	let summarizePending = false;
 	let opportunity: ReportOpportunity | undefined;
 	return {
-		requestSummary() { summarizePending = true; },
+		requestSummary(pending = true) { summarizePending = pending; },
 		start(branchId: string, hasGoal: boolean) {
 			const preserveEvidence = summarizePending && hasGoal;
 			summarizePending = false;
