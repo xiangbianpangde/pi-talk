@@ -17,7 +17,7 @@ This ledger records executed checks, not user acceptance. Overall release/freeze
 | Completed outcome mislabeled routine | Unit regression + controlled live completion mode | Validated completed outcome publishes once; routine label cannot hide completion |
 | Completion evidence | entry.ts information matrix + strict criterion tests | Every registered requirement needs an exact observed claim/evidence matching its criterion and acceptance set; inferred/unrelated evidence cannot cover requirement |
 | Observation safety | Exact text support + operator/unit/uncertainty and JSON/locator redaction tests | Symbols, units, scope, uncertainty and serialized credentials fail closed |
-| Delivery baseline | `recordBaseline` removed; `markDelivered` requires captured scope + sent receipt | Drafts never mutate baseline; stale/unsent/suppressed delivery rejected |
+| Delivery baseline | `recordBaseline` removed; `markDelivered` requires captured scope + sent receipt | Drafts never mutate baseline; captured scope + successful receipt required, including explicit override of a suppressed draft |
 | Immutable requirements | entry.ts | Same task cannot silently shrink list |
 | Failure resolution | entry.ts | Same tool/input later success requires explicit link; transport success is not general business verification |
 | Critical truncation | entry.ts | Incidental truncation warning; truncated acceptance/goal or dropped failure blocks completion |
@@ -53,6 +53,12 @@ All SDK tests run against actual installed Pi in isolated HOME. Provider fixture
 ## Side-channel review
 
 Existing `/review` and `/codex-review` entrances were run read-only with the configured model. Broad review was blocked by truncated source, so it is not a freeze approval. Smaller commit reviews approved the queue and cancellation deltas with explicit surrounding-source limitations. Review of task-boundary extraction found a pending-summary regression: bare `/talk` followed by nonempty `/talk` before start could retain old evidence. The pending flag now accepts a boolean, nonempty requests clear it, and a targeted regression passes. Subsequent complete-source reviews of trigger.ts and talk.ts found branch/task mutation, unbounded history, inconsistent disposal, stale abort clearing another scope, aborted-summary evidence loss and missing report-version queue protection; local fixes and regressions are recorded above. The adapter currently passes sessionId as its stable scope identity (not tree-leaf identity); session_tree resets provide same-session navigation isolation. This naming limitation and caller event ordering remain part of the unfrozen adapter contract. This is same-model side-channel review, not independent human or different-model acceptance. Raw review output remains local.
+
+### Complete-source observation/delivery review corrections
+
+Complete-source review found that token equivalence erased signs/units/uncertainty and that unrelated evidence could satisfy a criterion. Observation and criterion support now require exact trimmed text; semantic paraphrases remain inferred and cannot prove acceptance. This does not establish that the producer's criteria fully cover the user goal. Redaction covers serialized credential keys, escaped quoted values, locator and goal text; it is still best-effort and is not a general secret detector.
+
+Draft-time baseline mutation was removed from the public API. A baseline commit requires captured information scope and a sent receipt; the adapter also rechecks reporting scope after publication. This cannot retract already displayed output. Explicit override publication may commit its actual delivered content even if the original draft was suppressed. Goal truncation uses redacted length, preventing redaction expansion from silently dropping requirements.
 
 ### Test-review corrections
 
