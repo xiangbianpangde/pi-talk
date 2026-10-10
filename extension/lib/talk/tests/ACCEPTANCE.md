@@ -12,7 +12,7 @@ This ledger records executed checks, not user acceptance. Overall release/freeze
 | Preview/failure baseline | entry.ts and real SDK preview-before-publish | Preview does not consume baseline; failed send retryable |
 | Concurrent publication | entry.ts delivery queue | Identical concurrent operations serialized, failure does not poison queue |
 | Cancellation | pi-lifecycle.mjs | Aborted publication rejected without transcript entry |
-| Scope isolation | scopeVersion guard; SDK switch/fork/reload tests | Queued operation rejected after concurrent scope switch, no transcript entry |
+| Scope isolation | pi-lifecycle.mjs queuedStale test, introduced in f85bba1 | Actual ExtensionRunner: queue brief then concurrently emit session_before_switch; stale-scope rejection and no added transcript entry asserted. This is not an OS process-switch race. |
 | Routine suppression default | SDK before-settled publication | User-started task is not explicit stage authorization |
 | Completed outcome mislabeled routine | Unit regression + controlled live completion mode | Validated completed outcome publishes once; routine label cannot hide completion |
 | Completion evidence | entry.ts information matrix | Every registered requirement needs observed claim in acceptance set; inferred cannot cover requirement |
