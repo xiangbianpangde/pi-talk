@@ -74,7 +74,7 @@ export function createInformationEngine() {
 				seen.add(key); return true;
 			}).map((c): Claim => {
 				const sources = c.evidenceIds.filter((id) => known.has(id));
-				const observed = c.status === "observed" && sources.length > 0 && sources.every((id) => supportsClaim(c.text, known.get(id)!.text));
+				const observed = c.status === "observed" && sources.length > 0 && sources.length === c.evidenceIds.length && sources.every((id) => supportsClaim(c.text, known.get(id)!.text));
 				if (c.status === "observed" && !observed) warnings.push("Claim not directly supported; downgraded to unverified.");
 				const status = c.status === "observed" && !observed ? "unverified" : c.status;
 				const value = (c.kind === "blocker" ? 4 : c.kind === "risk" ? 3 : c.kind === "decision" ? 3 : 2) + (sources.length ? 1 : 0) + (status === "unverified" ? 1 : 0);

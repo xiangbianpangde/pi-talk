@@ -217,6 +217,8 @@ test("information: shadow scenarios preserve decisions, reject fabricated claims
 	const completion = completionEngine.refine("completed", [{ text: "all assertions passed", kind: "result", status: "observed", evidenceIds: ["check"] }], false, ["check"], { checks: [{ requirementId: "verify", evidenceIds: ["check"] }] }, "routine", false);
 	eq(completion.delivery, "send", "validated task completion overrides accidental routine label");
 	eq(engine.refine("completed", [], true, ["check"]).state, "partial");
+	const missingSource = engine.refine("partial", [{ text: "all assertions passed", kind: "result", status: "observed", evidenceIds: ["check", "missing"] }]);
+	eq(missingSource.claims[0].status, "unverified", "dropping an unknown citation must not turn claim into observed");
 	const paraphraseEngine = createInformationEngine();
 	paraphraseEngine.begin("verify output");
 	paraphraseEngine.collect("check", "test run", "46 tests passed", false);
