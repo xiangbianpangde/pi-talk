@@ -36,7 +36,8 @@ All SDK tests run against actual installed Pi in isolated HOME. Provider fixture
 | Resume | AgentSessionRuntime.switchSession | PASS; transcript restored, evidence clears |
 | Fork | AgentSessionRuntime.fork | PASS; new scope evidence empty |
 | Report publication and deduplication | Real ExtensionRunner/tool definitions/session entries | PASS; TUI visual rendering not tested |
-| Process crash/restart | Not executed | OPEN |
+| Fresh process resume | New Node process opens synthetic persisted history | PASS; transcript restored, evidence clears |
+| Crash during write | Not executed | OPEN; fresh-process resume is not crash-consistency proof |
 | Compaction during queued task | Not executed | OPEN |
 | Real provider retry/abort race | Not executed | OPEN |
 | Full trigger responsibility extraction | Some orchestration remains in talk.ts | OPEN; do not freeze whole Trigger Engine |

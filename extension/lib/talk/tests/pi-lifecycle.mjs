@@ -1,5 +1,6 @@
 /** Real Pi SDK loader/runner replay, offline and isolated by run-tests.mjs. */
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { join, resolve } from "node:path";
 import { homedir } from "node:os";
 import { pathToFileURL } from "node:url";
@@ -7,6 +8,24 @@ assert.equal(homedir(), process.env.TALK_TEST_HOME, "Use the isolated runner");
 const pkg = process.env.PI_CODING_AGENT_PACKAGE;
 assert.ok(pkg, "Set PI_CODING_AGENT_PACKAGE to the installed Pi package directory");
 const { createAgentSession, DefaultResourceLoader, SettingsManager, SessionManager, createAgentSessionRuntime, createAgentSessionServices, createAgentSessionFromServices } = await import(pathToFileURL(join(pkg, "dist", "index.js")).href);
+if (process.argv[2] === "--restart-probe") {
+ const manager = SessionManager.open(process.argv[3]);
+ const settingsManager = SettingsManager.inMemory({ defaultTools: [] });
+ const resources = new DefaultResourceLoader({ cwd: process.cwd(), agentDir: join(homedir(), ".pi", "agent"), settingsManager, noExtensions: true, noSkills: true, noThemes: true, noPromptTemplates: true, additionalExtensionPaths: [process.env.TALK_SDK_EXTENSION] });
+ await resources.reload();
+ assert.equal(resources.getExtensions().errors.length, 0);
+ const { session } = await createAgentSession({ cwd: process.cwd(), agentDir: join(homedir(), ".pi", "agent"), settingsManager, sessionManager: manager, resourceLoader: resources, noTools: "builtin" });
+ try {
+  await session.bindExtensions({});
+  const runner = session.extensionRunner;
+  const evidence = await runner.getToolDefinition("talk_report_context").execute("restart", {}, undefined, undefined, runner.createContext());
+  assert.equal(evidence.details.goal, "");
+  assert.equal(evidence.details.evidence.length, 0);
+  assert.ok(session.messages.some((m) => m.role === "user"));
+  console.log("# Fresh Pi process resume: passed (persisted synthetic transcript, ephemeral evidence cleared)");
+ } finally { session.dispose(); }
+ process.exit(0);
+}
 const settingsManager = SettingsManager.inMemory({ defaultTools: [], retry: { enabled: true, maxRetries: 1, baseDelayMs: 1, maxDelayMs: 10 } });
 let registered = false;
 const loader = new DefaultResourceLoader({ cwd: process.cwd(), agentDir: join(homedir(), ".pi", "agent"), settingsManager,
@@ -197,6 +216,7 @@ try {
  assert.notEqual(runtime.session, oldSession);
  assert.equal((await readState()).details.goal, "");
  assert.ok(originalPath);
+ execFileSync(process.execPath, [new URL(import.meta.url).pathname, "--restart-probe", originalPath], { env: process.env, stdio: "inherit", timeout: 60000 });
  const resumed = await runtime.switchSession(originalPath);
  assert.equal(resumed.cancelled, false);
  assert.equal((await readState()).details.evidence.length, 0);
