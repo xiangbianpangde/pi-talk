@@ -40,7 +40,7 @@ All SDK tests run against actual installed Pi in isolated HOME. Provider fixture
 | Fresh process resume | New Node process opens synthetic persisted history | PASS; transcript restored, evidence clears |
 | Crash during write | Not executed | OPEN; fresh-process resume is not crash-consistency proof |
 | Manual compaction | Actual session.compact with fixture summary override | PASS; ephemeral goal/evidence unchanged, compaction entry persisted |
-| Automatic compaction during queued task | Not executed | OPEN |
+| Automatic compaction during queued task | Actual AgentSession threshold fixture + queued follow-up and compaction_end | PASS with synthetic usage; no real provider compaction race |
 | Real provider retry/abort race | Not executed | OPEN |
 | Task-boundary state extraction | createReportScope owns start/summary/settled/reset state | PASS; evidence collection and presentation adapters remain in talk.ts |
 | Full trigger boundary/freeze review | Complete review not obtained | OPEN; do not freeze whole Trigger Engine |

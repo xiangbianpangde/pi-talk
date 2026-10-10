@@ -196,6 +196,32 @@ try {
  assert.equal(afterCompact.details.goal, beforeCompact.details.goal);
  assert.deepEqual(afterCompact.details.evidence, beforeCompact.details.evidence);
  assert.ok(runner.createContext().sessionManager.getEntries().some((e) => e.type === "compaction"));
+ // Actual threshold compaction while a follow-up is queued; fixture usage
+ // crosses the context threshold once, summary is intercepted by test hook.
+ session.setAutoCompactionEnabled(true);
+ let compactAttempts = 0, autoCompactions = 0, queuedAfterHighUsage = false;
+ session.agent.streamFunction = () => {
+  compactAttempts++;
+  const stream = createAssistantMessageEventStream();
+  const high = compactAttempts === 1;
+  const message = { role: "assistant", content: [{ type: "text", text: "Fixture compaction reply." }], api: fixtureModel.api, provider: fixtureModel.provider, model: fixtureModel.id, stopReason: "stop", timestamp: Date.now(), usage: { input: high ? 32767 : 1, output: 1, cacheRead: 0, cacheWrite: 0, totalTokens: high ? 32768 : 2, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } } };
+  queueMicrotask(() => { stream.push({ type: "start", partial: message }); stream.push({ type: "done", reason: "stop", message }); });
+  return stream;
+ };
+ const unsubscribeCompact = session.subscribe((event) => {
+  if ((event.type === "auto_compaction_end" || event.type === "compaction_end") && event.result) autoCompactions++;
+  if (event.type === "message_end" && event.message?.role === "assistant" && !queuedAfterHighUsage) {
+   queuedAfterHighUsage = true; session.followUp("Continue after automatic compaction");
+  }
+ });
+ await session.prompt("Exercise automatic compaction with queued follow-up");
+ await session.waitForIdle(); unsubscribeCompact();
+ assert.ok(autoCompactions >= 1, "actual threshold scheduler compacted before final settlement");
+ assert.equal(compactAttempts, 2, "queued continuation ran after automatic compaction");
+ const autoContext = await evidenceTool.execute("auto-compact-probe", {}, undefined, undefined, runner.createContext());
+ assert.equal(autoContext.details.opportunity.cause, "settled");
+ session.setAutoCompactionEnabled(false);
+ session.agent.streamFunction = normalStream;
  await session.reload();
  const reloadedRunner = session.extensionRunner;
  const reloadedContext = reloadedRunner.createContext();
