@@ -226,16 +226,35 @@ test("delivery: routine suppression, material send and explicit override share o
 	eq(explicit.sent, true); eq(explicit.reason, "explicit"); eq(sent.length, 2);
 });
 
+test("information: operators, unrelated criteria, redaction and stale baseline fail closed", () => {
+	const engine = createInformationEngine(); engine.begin("Implement encryption");
+	engine.defineRequirements([{ id: "encrypt", userAnchor: "encryption", criterion: "encryption passed" }]);
+	engine.collect("read", "read", "README opened", false);
+	const unrelated = engine.refine("completed", [{ text: "README opened", kind: "result", status: "observed", evidenceIds: ["read"] }], false, ["read"], { checks: [{ requirementId: "encrypt", evidenceIds: ["read"] }] });
+	eq(unrelated.state, "partial", "unrelated successful observation cannot satisfy criterion");
+	engine.collect("latency", "test", "latency > 100", false);
+	engine.collect("question", "test", "Tests passed?", false);
+	for (const [text, id] of [["latency < 100", "latency"], ["Tests passed.", "question"]]) {
+		eq(engine.refine("partial", [{ text, kind: "result", status: "observed", evidenceIds: [id] }]).claims[0].status, "unverified");
+	}
+	engine.collect("secret", "tool", 'Authorization: Bearer abc123\npassword="space secret"', false);
+	const secret = engine.context().evidence.find((e) => e.id === "secret")!.text;
+	ok(!secret.includes("abc123") && !secret.includes("space secret"));
+	const version = engine.scopeVersion();
+	engine.begin("new task");
+	eq(engine.markDelivered(unrelated, version), false, "in-flight old delivery cannot pollute new baseline");
+});
+
 test("information: shadow scenarios preserve decisions, reject fabricated claims and reset scope", () => {
 	const engine = createInformationEngine();
 	engine.begin("verify output");
-	engine.defineRequirements([{ id: "verify", userAnchor: "verify output", criterion: "assertions pass" }]);
+	engine.defineRequirements([{ id: "verify", userAnchor: "verify output", criterion: "all assertions passed" }]);
 	engine.collect("check", "test run", "all assertions passed", false);
 	const good = engine.refine("completed", [{ text: "all assertions passed", kind: "result", status: "observed", evidenceIds: ["check"] }], true, ["check"], { checks: [{ requirementId: "verify", evidenceIds: ["check"] }] });
 	eq(good.state, "completed");
 	const completionEngine = createInformationEngine();
 	completionEngine.begin("verify output");
-	completionEngine.defineRequirements([{ id: "verify", userAnchor: "verify output", criterion: "assertions pass" }]);
+	completionEngine.defineRequirements([{ id: "verify", userAnchor: "verify output", criterion: "all assertions passed" }]);
 	completionEngine.collect("check", "test", "all assertions passed", false);
 	const completion = completionEngine.refine("completed", [{ text: "all assertions passed", kind: "result", status: "observed", evidenceIds: ["check"] }], false, ["check"], { checks: [{ requirementId: "verify", evidenceIds: ["check"] }] }, "routine", false);
 	eq(completion.delivery, "send", "validated task completion overrides accidental routine label");
@@ -293,7 +312,7 @@ test("information: new evidence and risk identity cannot be deduplicated as unch
 
 test("information: immutable requirements and critical versus incidental truncation", () => {
 	const e = createInformationEngine(); e.begin("Implement A and B");
-	const requirements = [{ id: "a", userAnchor: "A", criterion: "A tested" }, { id: "b", userAnchor: "B", criterion: "B tested" }];
+	const requirements = [{ id: "a", userAnchor: "A", criterion: "A passed" }, { id: "b", userAnchor: "B", criterion: "B passed" }];
 	e.defineRequirements(requirements);
 	let rejected = false;
 	try { e.defineRequirements(requirements.slice(0, 1)); } catch { rejected = true; }
@@ -313,7 +332,7 @@ test("information: immutable requirements and critical versus incidental truncat
 
 test("information: failure repair and full requirement coverage govern completion", () => {
 	const e = createInformationEngine(); e.begin("Implement A and B");
-	e.defineRequirements([{ id: "a", userAnchor: "A", criterion: "A tested" }, { id: "b", userAnchor: "B", criterion: "B tested" }]);
+	e.defineRequirements([{ id: "a", userAnchor: "A", criterion: "A passed" }, { id: "b", userAnchor: "B", criterion: "B passed" }]);
 	e.collect("bad", "test A", "failed", true, "check-a");
 	e.collect("pass-a", "test A", "A passed", false, "check-a");
 	e.collect("pass-b", "test B", "B passed", false, "check-b");
@@ -337,7 +356,7 @@ test("information: shadow matrix covers completed, partial, failed, blocked, unc
 	];
 	for (const sample of cases) {
 		const e = createInformationEngine(); e.begin("goal");
-		e.defineRequirements([{ id: "goal", userAnchor: "goal", criterion: "result supported" }]);
+		e.defineRequirements([{ id: "goal", userAnchor: "goal", criterion: sample.claims[0].text }]);
 		e.collect(sample.claims[0].evidenceIds[0] || "none", "fixture", sample.claims[0].text, sample.state === "failed");
 		const brief = e.refine(sample.state, sample.claims, true, sample.state === "completed" ? ["ok"] : [], { checks: [{ requirementId: "goal", evidenceIds: ["ok"] }] });
 		eq(brief.state, sample.expected);

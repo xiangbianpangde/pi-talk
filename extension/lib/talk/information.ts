@@ -13,6 +13,7 @@ const tokens = (value: string) => value.toLowerCase().match(/[a-z0-9]+|[\u4e00-\
 const meaningful = (value: string) => tokens(value).filter((t) => !STOPWORDS.has(t));
 const numbers = (value: string) => (value.match(/\d+(?:\.\d+)?/g) || []).sort();
 function supportsClaim(claim: string, evidence: string): boolean {
+	if (/[<>]=?|[!=]=?|\?/.test(claim) || /[<>]=?|[!=]=?|\?/.test(evidence)) return evidence.trim().toLowerCase() === claim.trim().toLowerCase();
 	if (evidence.trim().toLowerCase() === claim.trim().toLowerCase()) return true;
 	const claimNumbers = numbers(claim), evidenceNumbers = numbers(evidence);
 	if (claimNumbers.some((n) => !evidenceNumbers.includes(n))) return false;
@@ -51,7 +52,9 @@ export function createInformationEngine() {
 		collect(id: string, locator: string, text: string, failed: boolean, checkKey?: string) {
 			if (!goal || evidence.some((e) => e.id === id)) return;
 			// Bound context and redact common credentials before exposing it to the producer.
-			const safe = text.replace(/(api[_-]?key|password|token|authorization)\s*[:=]\s*\S+/gi, "$1=[redacted]");
+			const safe = text
+				.replace(/(authorization)\s*:\s*(?:bearer|basic)\s+[^\r\n]+/gi, "$1: [redacted]")
+				.replace(/(api[_-]?key|password|token)\s*[:=]\s*(?:"[^"]*"|'[^']*'|[^\s,;]+)/gi, "$1=[redacted]");
 			if (safe.length > 3000) incomplete = true;
 			evidence.push({ id, locator, text: safe.slice(0, 3000), failed, observedAt: Date.now(), checkKey, truncated: safe.length > 3000 });
 			if (evidence.length > 24) {
@@ -62,7 +65,7 @@ export function createInformationEngine() {
 			}
 		},
 		scopeVersion() { return scopeVersion; },
-		markDelivered(brief: Brief) { previous = fingerprint(JSON.stringify({ state: brief.state, claims: brief.claims })); },
+		markDelivered(brief: Brief, expectedScope = scopeVersion) { if (expectedScope !== scopeVersion) return false; previous = fingerprint(JSON.stringify({ state: brief.state, claims: brief.claims })); return true; },
 		context() { return { goal, requirements: requirements.map((r) => ({ ...r })), evidence: evidence.map((e) => ({ ...e })), incomplete, goalIncomplete, droppedFailure }; },
 		refine(state: TaskState, candidates: Claim[], explicit = true, acceptanceEvidenceIds: string[] = [], mapping: AcceptanceMap = {}, updatePurpose: "outcome" | "routine" = "outcome", recordBaseline = true): Brief {
 			const warnings: string[] = [];
@@ -99,7 +102,7 @@ export function createInformationEngine() {
 					c.kind === "result" && c.status === "observed" && c.evidenceIds.includes(id)));
 			const coverage = requirements.length > 0 && requirements.every((r) => (mapping.checks || []).some((check) =>
 				check.requirementId === r.id && check.evidenceIds.length > 0 && check.evidenceIds.every((id) =>
-					acceptanceEvidenceIds.includes(id) && known.has(id) && !known.get(id)!.failed && !known.get(id)!.truncated && claims.some((c) => c.kind === "result" && c.status === "observed" && c.evidenceIds.includes(id)))));
+					acceptanceEvidenceIds.includes(id) && known.has(id) && !known.get(id)!.failed && !known.get(id)!.truncated && claims.some((c) => c.kind === "result" && c.status === "observed" && c.evidenceIds.includes(id) && supportsClaim(r.criterion, known.get(id)!.text)))));
 			if (!coverage) warnings.push("Required acceptance criteria are absent or not fully mapped to successful evidence.");
 			if (state === "completed" && !claims.length) warnings.push("An empty brief cannot establish completion.");
 			// Even a supported claim is not a complete acceptance protocol. The producer
