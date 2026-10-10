@@ -152,5 +152,12 @@ try {
  assert.equal(resumed.cancelled, false);
  assert.equal((await readState()).details.evidence.length, 0);
  assert.ok(runtime.session.messages.some((m) => m.role === "user"));
+ const userEntry = runtime.session.extensionRunner.createContext().sessionManager.getEntries().find((e) => e.type === "message" && e.message.role === "user");
+ assert.ok(userEntry);
+ const forked = await runtime.fork(userEntry.id, { position: "at" });
+ assert.equal(forked.cancelled, false);
+ const forkState = await readState();
+ assert.equal(forkState.details.goal, "");
+ assert.equal(forkState.details.evidence.length, 0);
  console.log("# Real Pi runtime replacement/resume: passed (synthetic persisted history, no provider)");
 } finally { await runtime.dispose(); }
