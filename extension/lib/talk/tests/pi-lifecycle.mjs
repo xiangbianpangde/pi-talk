@@ -200,8 +200,10 @@ try {
  // crosses the context threshold once, summary is intercepted by test hook.
  session.setAutoCompactionEnabled(true);
  let compactAttempts = 0, autoCompactions = 0, queuedAfterHighUsage = false;
+ const compactTrace = [];
  session.agent.streamFunction = () => {
   compactAttempts++;
+  compactTrace.push(`stream-${compactAttempts}`);
   const stream = createAssistantMessageEventStream();
   const high = compactAttempts === 1;
   const message = { role: "assistant", content: [{ type: "text", text: "Fixture compaction reply." }], api: fixtureModel.api, provider: fixtureModel.provider, model: fixtureModel.id, stopReason: "stop", timestamp: Date.now(), usage: { input: high ? 32767 : 1, output: 1, cacheRead: 0, cacheWrite: 0, totalTokens: high ? 32768 : 2, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } } };
@@ -209,15 +211,19 @@ try {
   return stream;
  };
  const unsubscribeCompact = session.subscribe((event) => {
-  if ((event.type === "auto_compaction_end" || event.type === "compaction_end") && event.result) autoCompactions++;
+  if (event.type === "compaction_start" && event.reason === "threshold") compactTrace.push("threshold-start");
+  if (event.type === "compaction_end" && event.reason === "threshold" && event.result) { autoCompactions++; compactTrace.push("threshold-end"); }
   if (event.type === "message_end" && event.message?.role === "assistant" && !queuedAfterHighUsage) {
-   queuedAfterHighUsage = true; session.followUp("Continue after automatic compaction");
+   queuedAfterHighUsage = true; compactTrace.push("queued"); session.followUp("Continue after automatic compaction");
   }
  });
  await session.prompt("Exercise automatic compaction with queued follow-up");
  await session.waitForIdle(); unsubscribeCompact();
  assert.ok(autoCompactions >= 1, "actual threshold scheduler compacted before final settlement");
  assert.equal(compactAttempts, 2, "queued continuation ran after automatic compaction");
+ assert.ok(compactTrace.indexOf("queued") < compactTrace.indexOf("threshold-start"), JSON.stringify(compactTrace));
+ assert.ok(compactTrace.indexOf("threshold-start") < compactTrace.indexOf("threshold-end"), JSON.stringify(compactTrace));
+ assert.ok(compactTrace.indexOf("threshold-end") < compactTrace.indexOf("stream-2"), JSON.stringify(compactTrace));
  const autoContext = await evidenceTool.execute("auto-compact-probe", {}, undefined, undefined, runner.createContext());
  assert.equal(autoContext.details.opportunity.cause, "settled");
  session.setAutoCompactionEnabled(false);
