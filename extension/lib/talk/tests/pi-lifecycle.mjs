@@ -38,6 +38,8 @@ try {
  const before = await evidenceTool.execute("probe", {}, undefined, undefined, ctx);
  assert.equal(before.details.goal, "Verify A");
  assert.equal(before.details.evidence.length, 1);
+ const routineBeforeSettled = await briefTool.execute("routine-before-settled", { state: "partial", publish: true, updatePurpose: "routine", claims: [{ text: "routine checkpoint", kind: "result", status: "inferred", evidenceIds: [] }] }, undefined, undefined, ctx);
+ assert.equal(routineBeforeSettled.details.delivery.sent, false, "user-started task does not bypass routine suppression by default");
  await runner.emit({ type: "agent_before_settle", entries: [], continue: false, context: {}, outcome: "success" });
  await runner.emit({ type: "agent_settled", aborted: false });
  const settled = await evidenceTool.execute("probe", {}, undefined, undefined, ctx);

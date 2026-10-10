@@ -138,14 +138,15 @@ export default function (pi: ExtensionAPI) {
 			state: Type.Union([Type.Literal("completed"), Type.Literal("partial"), Type.Literal("failed"), Type.Literal("blocked"), Type.Literal("unknown")]),
 			publish: Type.Optional(Type.Boolean({ description: "Publish a non-blocking transcript update after validation; default false. Never use for routine milestones." })),
 			updatePurpose: Type.Optional(Type.Union([Type.Literal("outcome"), Type.Literal("routine")], { description: "Routine milestone/plan/commit chatter is suppressed for automatic opportunities; actual outcomes remain reportable." })),
-			explicit: Type.Optional(Type.Boolean()), acceptanceEvidenceIds: Type.Optional(Type.Array(Type.String())),
+			explicit: Type.Optional(Type.Boolean({ description: "True only when responding to a user request for this report, not merely because the task began with a user prompt. Default false." })), acceptanceEvidenceIds: Type.Optional(Type.Array(Type.String())),
 			checks: Type.Optional(Type.Array(Type.Object({ requirementId: Type.String(), evidenceIds: Type.Array(Type.String()) }))),
 			resolutions: Type.Optional(Type.Array(Type.Object({ failureId: Type.String(), verificationId: Type.String() }))),
 			claims: Type.Array(Type.Object({ text: Type.String(), kind: Type.Union([Type.Literal("result"), Type.Literal("risk"), Type.Literal("blocker"), Type.Literal("decision")]), status: Type.Union([Type.Literal("observed"), Type.Literal("inferred"), Type.Literal("unverified")]), evidenceIds: Type.Array(Type.String()) })),
 		}),
 		async execute(_id, params, _signal, _onUpdate, ctx) {
 			return enqueueDelivery(async () => {
-			const explicit = params.explicit ?? opportunity?.cause === "explicit";
+			// A user-started task is not an explicit request for every stage update.
+			const explicit = params.explicit === true;
 			const brief = information.refine(params.state, params.claims, explicit, params.acceptanceEvidenceIds, { checks: params.checks, resolutions: params.resolutions }, params.updatePurpose, false);
 			const delivery = params.publish ? await deliverBrief(brief, { publish: (content) => pi.sendMessage({ customType: "talk-stage-update", content, display: true, details: { state: brief.state, continuation: "continue" } }, { triggerTurn: false }) }, { explicit }) : undefined;
 			if (delivery?.sent) information.markDelivered(brief);
