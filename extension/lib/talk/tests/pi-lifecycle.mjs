@@ -7,7 +7,7 @@ assert.equal(homedir(), process.env.TALK_TEST_HOME, "Use the isolated runner");
 const pkg = process.env.PI_CODING_AGENT_PACKAGE;
 assert.ok(pkg, "Set PI_CODING_AGENT_PACKAGE to the installed Pi package directory");
 const { createAgentSession, DefaultResourceLoader, SettingsManager, SessionManager, createAgentSessionRuntime, createAgentSessionServices, createAgentSessionFromServices } = await import(pathToFileURL(join(pkg, "dist", "index.js")).href);
-const settingsManager = SettingsManager.inMemory({ defaultTools: [] });
+const settingsManager = SettingsManager.inMemory({ defaultTools: [], retry: { enabled: true, maxRetries: 1, baseDelayMs: 1, maxDelayMs: 10 } });
 let registered = false;
 const loader = new DefaultResourceLoader({ cwd: process.cwd(), agentDir: join(homedir(), ".pi", "agent"), settingsManager,
  noExtensions: true, noSkills: true, noPromptTemplates: true, noThemes: true,
@@ -134,6 +134,27 @@ try {
  const recovered = await evidenceTool.execute("recovery-probe", {}, undefined, undefined, runner.createContext());
  assert.equal(recovered.details.goal, "Recovery after abort");
  assert.equal(recovered.details.opportunity.cause, "settled");
+ // Exercise Pi's real retry scheduler with one fixture 503, no HTTP request.
+ let attempts = 0;
+ session.agent.streamFunction = (...args) => {
+  attempts++;
+  if (attempts > 1) return normalStream(...args);
+  const stream = createAssistantMessageEventStream();
+  const message = { role: "assistant", content: [], api: fixtureModel.api, provider: fixtureModel.provider, model: fixtureModel.id, stopReason: "error", errorMessage: "503 Service Unavailable", timestamp: Date.now(), usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } } };
+  queueMicrotask(() => stream.push({ type: "error", reason: "error", error: message }));
+  return stream;
+ };
+ let retries = 0;
+ const unsubscribeRetry = session.subscribe((event) => { if (event.type === "auto_retry_start") retries++; });
+ await session.prompt("Retry recovery task");
+ await session.waitForIdle();
+ unsubscribeRetry();
+ assert.equal(attempts, 2);
+ assert.equal(retries, 1);
+ assert.equal(session.getLastAssistantText(), "Fixture reply; no completion claim.");
+ const retryContext = await evidenceTool.execute("retry-probe", {}, undefined, undefined, runner.createContext());
+ assert.equal(retryContext.details.opportunity.cause, "settled");
+ session.agent.streamFunction = normalStream;
  await session.reload();
  const reloadedRunner = session.extensionRunner;
  const reloadedContext = reloadedRunner.createContext();
