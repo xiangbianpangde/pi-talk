@@ -15,7 +15,9 @@ This ledger records executed checks, not user acceptance. Overall release/freeze
 | Scope isolation | pi-lifecycle.mjs queuedStale test, introduced in f85bba1 | Actual ExtensionRunner: queue brief then concurrently emit session_before_switch; stale-scope rejection and no added transcript entry asserted. This is not an OS process-switch race. |
 | Routine suppression default | SDK before-settled publication | User-started task is not explicit stage authorization |
 | Completed outcome mislabeled routine | Unit regression + controlled live completion mode | Validated completed outcome publishes once; routine label cannot hide completion |
-| Completion evidence | entry.ts information matrix | Every registered requirement needs observed claim in acceptance set; inferred cannot cover requirement |
+| Completion evidence | entry.ts information matrix + strict criterion tests | Every registered requirement needs an exact observed claim/evidence matching its criterion and acceptance set; inferred/unrelated evidence cannot cover requirement |
+| Observation safety | Exact text support + operator/unit/uncertainty and JSON/locator redaction tests | Symbols, units, scope, uncertainty and serialized credentials fail closed |
+| Delivery baseline | `recordBaseline` removed; `markDelivered` requires captured scope + sent receipt | Drafts never mutate baseline; stale/unsent/suppressed delivery rejected |
 | Immutable requirements | entry.ts | Same task cannot silently shrink list |
 | Failure resolution | entry.ts | Same tool/input later success requires explicit link; transport success is not general business verification |
 | Critical truncation | entry.ts | Incidental truncation warning; truncated acceptance/goal or dropped failure blocks completion |
