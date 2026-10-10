@@ -43,7 +43,8 @@ All SDK tests run against actual installed Pi in isolated HOME. Provider fixture
 | Automatic compaction during queued task | Actual AgentSession threshold fixture + queued follow-up; full event trace assertions | PASS with synthetic usage: queued → threshold-start → threshold-end → stream-2; every marker must exist. No real provider compaction race. |
 | Real provider retry/abort race | Not executed | OPEN |
 | Task-boundary state extraction | createReportScope owns start/summary/settled/reset state | PASS; evidence collection and presentation adapters remain in talk.ts |
-| Full trigger boundary/freeze review | Complete review not obtained | OPEN; do not freeze whole Trigger Engine |
+| Trigger scope hardening | Full-source review found stale-branch clear, mutable exposure, unbounded dedup and disposal-error gaps; fixes + regressions in 710741a/53fcc59 | PASS for reviewed local contracts; same-branch delayed settlement still requires caller ordering |
+| Full trigger boundary/freeze review | Complete system/caller review not obtained | OPEN; task-scope core is hardened, but do not freeze whole Trigger Engine |
 
 ## Side-channel review
 
