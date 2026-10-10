@@ -141,7 +141,11 @@ export default function (pi: ExtensionAPI) {
 			const brief = information.refine(params.state, params.claims, explicit, params.acceptanceEvidenceIds, { checks: params.checks, resolutions: params.resolutions }, params.updatePurpose, false);
 			const delivery = params.publish ? await deliverBrief(brief, { publish: (content) => pi.sendMessage({ customType: "talk-stage-update", content, display: true, details: { state: brief.state, continuation: "continue" } }, { triggerTurn: false }) }, { explicit }) : undefined;
 			if (delivery?.sent) information.markDelivered(brief);
-			return { content: [{ type: "text", text: briefText(brief) || "No material update delivered; continue the authorized task." }], details: { ...brief, delivery } };
+			return { content: [{ type: "text", text: delivery?.sent
+				? "Stage update published in the main transcript. Do not repeat it; continue the authorized task."
+				: delivery
+					? "No stage update published. Continue the authorized task without a milestone reply or permission question."
+					: briefText(brief) }], details: { ...brief, delivery } };
 			});
 		},
 	});

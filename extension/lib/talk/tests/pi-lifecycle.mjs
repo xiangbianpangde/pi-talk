@@ -70,6 +70,8 @@ try {
  assert.equal(preview.details.delivery, undefined);
  const published = await briefTool.execute("publish", params, undefined, undefined, ctx);
  assert.equal(published.details.delivery.sent, true);
+ assert.ok(published.content[0].text.includes("Do not repeat it"));
+ assert.ok(!published.content[0].text.includes("passed ["), "delivery response does not echo the published draft");
  const stageEntries = () => ctx.sessionManager.getEntries().filter((e) => e.type === "custom_message" && e.customType === "talk-stage-update");
  assert.equal(stageEntries().length, 1, "actual Pi transcript contains one stage entry");
  const repeated = await briefTool.execute("repeat", params, undefined, undefined, ctx);
