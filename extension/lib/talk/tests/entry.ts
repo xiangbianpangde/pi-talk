@@ -237,6 +237,16 @@ test("information: operators, unrelated criteria, redaction and stale baseline f
 	for (const [text, id] of [["latency < 100", "latency"], ["Tests passed.", "question"]]) {
 		eq(engine.refine("partial", [{ text, kind: "result", status: "observed", evidenceIds: [id] }]).claims[0].status, "unverified");
 	}
+	for (const [index, claim, source] of [
+		[0, "latency 10 ms", "latency ~10 ms"],
+		[1, "error 5%", "error 5"],
+		[2, "temperature 5 C", "temperature -5 C"],
+		[3, "value 10", "value ≤10"],
+		[4, "speed 10 m/s", "speed 10 ms"],
+	] as const) {
+		engine.collect(`symbol-${index}`, "test", source, false);
+		eq(engine.refine("partial", [{ text: claim, kind: "result", status: "observed", evidenceIds: [`symbol-${index}`] }]).claims[0].status, "unverified", "symbols and units cannot be erased");
+	}
 	engine.collect("secret", "tool", 'Authorization: Bearer abc123\npassword="space secret"', false);
 	const secret = engine.context().evidence.find((e) => e.id === "secret")!.text;
 	ok(!secret.includes("abc123") && !secret.includes("space secret"));
