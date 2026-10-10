@@ -26,11 +26,13 @@ if (process.argv[2] === "--restart-probe") {
  } finally { session.dispose(); }
  process.exit(0);
 }
-const settingsManager = SettingsManager.inMemory({ defaultTools: [], retry: { enabled: true, maxRetries: 1, baseDelayMs: 1, maxDelayMs: 10 } });
+const settingsManager = SettingsManager.inMemory({ defaultTools: [], compaction: { enabled: false, keepRecentTokens: 10, reserveTokens: 10 }, retry: { enabled: true, maxRetries: 1, baseDelayMs: 1, maxDelayMs: 10 } });
 let registered = false;
 const loader = new DefaultResourceLoader({ cwd: process.cwd(), agentDir: join(homedir(), ".pi", "agent"), settingsManager,
  noExtensions: true, noSkills: true, noPromptTemplates: true, noThemes: true,
- additionalExtensionPaths: [process.env.TALK_SDK_EXTENSION || resolve("extension/talk.ts")], extensionFactories: [(pi) => { registered = true; }] });
+ additionalExtensionPaths: [process.env.TALK_SDK_EXTENSION || resolve("extension/talk.ts")], extensionFactories: [(pi) => { registered = true;
+  pi.on("session_before_compact", (event) => ({ compaction: { summary: "Synthetic test summary; not a completion assertion.", firstKeptEntryId: event.preparation.firstKeptEntryId, tokensBefore: event.preparation.tokensBefore } }));
+ }] });
 await loader.reload();
 const extensions = loader.getExtensions();
 assert.equal(extensions.errors.length, 0, JSON.stringify(extensions.errors));
@@ -180,6 +182,13 @@ try {
  const retryContext = await evidenceTool.execute("retry-probe", {}, undefined, undefined, runner.createContext());
  assert.equal(retryContext.details.opportunity.cause, "settled");
  session.agent.streamFunction = normalStream;
+ const beforeCompact = await evidenceTool.execute("before-compact", {}, undefined, undefined, runner.createContext());
+ const compacted = await session.compact();
+ assert.ok(compacted.summary.includes("Synthetic test summary"));
+ const afterCompact = await evidenceTool.execute("after-compact", {}, undefined, undefined, runner.createContext());
+ assert.equal(afterCompact.details.goal, beforeCompact.details.goal);
+ assert.deepEqual(afterCompact.details.evidence, beforeCompact.details.evidence);
+ assert.ok(runner.createContext().sessionManager.getEntries().some((e) => e.type === "compaction"));
  await session.reload();
  const reloadedRunner = session.extensionRunner;
  const reloadedContext = reloadedRunner.createContext();

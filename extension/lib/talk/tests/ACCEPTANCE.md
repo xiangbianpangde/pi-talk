@@ -38,9 +38,11 @@ All SDK tests run against actual installed Pi in isolated HOME. Provider fixture
 | Report publication and deduplication | Real ExtensionRunner/tool definitions/session entries | PASS; TUI visual rendering not tested |
 | Fresh process resume | New Node process opens synthetic persisted history | PASS; transcript restored, evidence clears |
 | Crash during write | Not executed | OPEN; fresh-process resume is not crash-consistency proof |
-| Compaction during queued task | Not executed | OPEN |
+| Manual compaction | Actual session.compact with fixture summary override | PASS; ephemeral goal/evidence unchanged, compaction entry persisted |
+| Automatic compaction during queued task | Not executed | OPEN |
 | Real provider retry/abort race | Not executed | OPEN |
-| Full trigger responsibility extraction | Some orchestration remains in talk.ts | OPEN; do not freeze whole Trigger Engine |
+| Task-boundary state extraction | createReportScope owns start/summary/settled/reset state | PASS; evidence collection and presentation adapters remain in talk.ts |
+| Full trigger boundary/freeze review | Complete review not obtained | OPEN; do not freeze whole Trigger Engine |
 
 ## Quality and cost
 

@@ -11,7 +11,7 @@ import { exportImageReport } from "../report-image/export";
 import { getSessionDir } from "../paths";
 import { randomUUID } from "node:crypto";
 import registerTalk from "../../../talk";
-import { createTalkTriggerHandlers, parseTalkArgs, resolveTalkStart, registerTalkLifecycle, createOpportunityRouter } from "../trigger";
+import { createTalkTriggerHandlers, parseTalkArgs, resolveTalkStart, registerTalkLifecycle, createOpportunityRouter, createReportScope } from "../trigger";
 import { createInformationEngine, briefText } from "../information";
 import { createDeliveryQueue, deliverBrief } from "../delivery";
 import { auditExplainContent } from "../explain-audit";
@@ -57,6 +57,22 @@ test("isolation: session writes stay inside the disposable test home", () => {
 	ok(expected, "tests must run through the isolated runner");
 	eq(homedir(), expected!);
 	ok(getSessionDir("isolation-probe").startsWith(join(expected!, ".pi", "agent", "talk", "sessions")));
+});
+
+test("trigger: report scope preserves only requested summary and resets branch boundaries", () => {
+	const scope = createReportScope();
+	eq(scope.start("a", false).preserveEvidence, false);
+	scope.requestSummary();
+	eq(scope.start("a", true).preserveEvidence, true);
+	scope.settle("a", false, true);
+	const settled = scope.current();
+	eq(settled?.cause, "settled");
+	scope.settle("a", false, true); eq(scope.current()?.id, settled?.id);
+	scope.settle("a", true, true); eq(scope.current()?.id, settled?.id);
+	eq(scope.start("a", true).preserveEvidence, false, "new task does not inherit previous summary request");
+	scope.requestSummary(); scope.reset();
+	eq(scope.current(), undefined);
+	eq(scope.start("b", true).preserveEvidence, false);
 });
 
 test("trigger: opportunity replay deduplicates retries without claiming completion", () => {
