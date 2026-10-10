@@ -55,6 +55,10 @@ try {
  const requested = await briefTool.execute("explicit", { ...params, explicit: true }, undefined, undefined, ctx);
  assert.equal(requested.details.delivery.sent, true);
  assert.equal(stageEntries().length, 2);
+ const routine = await briefTool.execute("routine", { state: "partial", claims: [{ text: "Plan next step", kind: "result", status: "inferred", evidenceIds: [] }], explicit: false, updatePurpose: "routine", publish: true }, undefined, undefined, ctx);
+ assert.equal(routine.details.delivery.sent, false);
+ assert.equal(routine.details.continuation, "continue");
+ assert.equal(stageEntries().length, 2, "routine stage creates no actual transcript entry");
  await runner.emit({ type: "agent_settled", aborted: false });
  await runner.emit({ type: "agent_settled", aborted: true });
  await runner.emit({ type: "session_before_switch", sessionPath: "memory" });
