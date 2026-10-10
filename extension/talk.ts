@@ -139,7 +139,7 @@ export default function (pi: ExtensionAPI) {
 			}
 			// A user-started task is not an explicit request for every stage update.
 			const explicit = params.explicit === true;
-			const brief = information.refine(params.state, params.claims, explicit, params.acceptanceEvidenceIds, { checks: params.checks, resolutions: params.resolutions }, params.updatePurpose, false);
+			const brief = information.refine(params.state, params.claims, explicit, params.acceptanceEvidenceIds, { checks: params.checks, resolutions: params.resolutions }, params.updatePurpose);
 			const delivery = params.publish ? await deliverBrief(brief, { publish: (content) => pi.sendMessage({ customType: "talk-stage-update", content, display: true, details: { state: brief.state, continuation: "continue" } }, { triggerTurn: false }) }, { explicit }) : undefined;
 			if (delivery?.sent && reportVersion === reportScope.scopeVersion()) information.markDelivered(brief, scopeVersion, { sent: true });
 			return { content: [{ type: "text", text: delivery?.sent

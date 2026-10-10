@@ -57,7 +57,7 @@ export function createInformationEngine() {
 		scopeVersion() { return scopeVersion; },
 		markDelivered(brief: Brief, expectedScope: number, receipt: { sent: true }) { if (expectedScope !== scopeVersion || brief.delivery === "suppress" || !receipt.sent) return false; previous = fingerprint(JSON.stringify({ state: brief.state, claims: brief.claims })); return true; },
 		context() { return { goal, requirements: requirements.map((r) => ({ ...r })), evidence: evidence.map((e) => ({ ...e })), incomplete, goalIncomplete, droppedFailure }; },
-		refine(state: TaskState, candidates: Claim[], explicit = true, acceptanceEvidenceIds: string[] = [], mapping: AcceptanceMap = {}, updatePurpose: "outcome" | "routine" = "outcome", recordBaseline = false): Brief {
+		refine(state: TaskState, candidates: Claim[], explicit = true, acceptanceEvidenceIds: string[] = [], mapping: AcceptanceMap = {}, updatePurpose: "outcome" | "routine" = "outcome"): Brief {
 			const warnings: string[] = [];
 			const known = new Map(evidence.map((e) => [e.id, e]));
 			const seen = new Set<string>();
@@ -111,8 +111,7 @@ export function createInformationEngine() {
 			const processOnly = updatePurpose === "routine" && state !== "completed" && !claims.some((c) => c.kind === "blocker" || c.kind === "risk" || c.kind === "decision");
 			const delivery = !explicit && (unchanged || state === "unknown" || !claims.length || processOnly) ? "suppress" : "send";
 			if (processOnly) warnings.push("Stage-only update suppressed; continue the authorized task without asking the user.");
-			// Suppressed routine drafts are not a delivered baseline.
-			if (delivery === "send" && recordBaseline) previous = current;
+			// Draft computation never advances the delivered baseline.
 			const reason = explicit ? "explicit" : unchanged || processOnly ? "unchanged" : state === "unknown" || !claims.length ? "insufficient-evidence" : "material-change";
 			// A blocker may have agent-resolvable alternatives. This draft cannot grant
 			// permission to stop or infer that the user must act.

@@ -187,7 +187,7 @@ test("delivery: concurrent operations serialize validation and survive failed se
 	const engine = createInformationEngine(); engine.begin("goal");
 	let sent = 0;
 	const publish = () => queue(async () => {
-		const brief = engine.refine("partial", [{ text: "new risk", kind: "risk", status: "inferred", evidenceIds: [] }], false, [], {}, "outcome", false);
+		const brief = engine.refine("partial", [{ text: "new risk", kind: "risk", status: "inferred", evidenceIds: [] }], false, [], {}, "outcome");
 		const result = await deliverBrief(brief, { publish: async () => { await Promise.resolve(); sent++; } });
 		if (result.sent) engine.markDelivered(brief, engine.scopeVersion(), { sent: true });
 	});
@@ -201,7 +201,7 @@ test("delivery: concurrent operations serialize validation and survive failed se
 test("delivery: failed publication and previews do not consume the delivery baseline", async () => {
 	const engine = createInformationEngine(); engine.begin("goal");
 	const claims = [{ text: "new risk", kind: "risk" as const, status: "inferred" as const, evidenceIds: [] }];
-	const draft = () => engine.refine("partial", claims, false, [], {}, "outcome", false);
+	const draft = () => engine.refine("partial", claims, false, [], {}, "outcome");
 	let failed = false;
 	try { await deliverBrief(draft(), { publish: () => { throw new Error("transport unavailable"); } }); } catch { failed = true; }
 	ok(failed);
@@ -259,7 +259,7 @@ test("information: shadow scenarios preserve decisions, reject fabricated claims
 	completionEngine.begin("verify output");
 	completionEngine.defineRequirements([{ id: "verify", userAnchor: "verify output", criterion: "all assertions passed" }]);
 	completionEngine.collect("check", "test", "all assertions passed", false);
-	const completion = completionEngine.refine("completed", [{ text: "all assertions passed", kind: "result", status: "observed", evidenceIds: ["check"] }], false, ["check"], { checks: [{ requirementId: "verify", evidenceIds: ["check"] }] }, "routine", false);
+	const completion = completionEngine.refine("completed", [{ text: "all assertions passed", kind: "result", status: "observed", evidenceIds: ["check"] }], false, ["check"], { checks: [{ requirementId: "verify", evidenceIds: ["check"] }] }, "routine");
 	eq(completion.delivery, "send", "validated task completion overrides accidental routine label");
 	eq(engine.refine("completed", [], true, ["check"]).state, "partial");
 	const missingSource = engine.refine("partial", [{ text: "all assertions passed", kind: "result", status: "observed", evidenceIds: ["check", "missing"] }]);
