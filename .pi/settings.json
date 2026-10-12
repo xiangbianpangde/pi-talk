@@ -1,0 +1,3 @@
+{
+  "extensions": ["../extension/task-guard.ts"]
+}

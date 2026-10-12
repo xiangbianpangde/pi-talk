@@ -13,6 +13,8 @@
 
 Patch 治理现在先解析已存在的目标 Surface，再决定审计规则和报告许可；显式跨样式 Patch 与未知目标会被拒绝。HTML/图片许可会在异步渲染前同步占用，失败释放，成功后消费（包括带 warning 但成功的渲染）。
 
+执行边界保护：项目 `.pi/settings.json` 会加载 `extension/task-guard.ts`。它只对已登记且仍有待办的授权计划在 `agent_before_settle` 自动续跑；真实输入、授权或环境阻塞可暂停，并有无进展上限。需要新会话或 reload 才会加载配置。其他项目需显式在全局 Pi `settings.json` 添加扩展绝对路径；本机已获得用户授权并完成添加，同一路径的项目/全局配置只加载一次。离线真实 SDK 验证：`node extension/lib/talk/tests/task-guard.mjs`；可选真实模型探针：`TASK_GUARD_LIVE=1 TALK_AUTH_ROOT=... node extension/lib/talk/tests/task-guard-live.mjs`（真实模型未按脚本要求故意制造阶段停止，脚本断言未通过；随后真实项目会话已记录普通 assistant stop → `task-guard-continue` → 后续模型工具调用，证明本次真实任务的钩子触发和续跑，不代表所有任务都能完成）。
+
 运行隔离回归：`node extension/lib/talk/tests/run-tests.mjs`。发布验收使用 `TALK_REQUIRE_CHROME=1 node extension/lib/talk/tests/run-tests.mjs`；缺少 Chromium 时发布模式失败，普通模式明确报告 SKIP。当前 runner 仍依赖本机 esbuild、parse5 和 typebox，尚未成为可移植 CI 环境；macOS 无可用显示上下文时 Chromium 可能间歇失败，不会自动重试或伪报通过。
 
 ## 概述
