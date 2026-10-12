@@ -76,4 +76,45 @@ try {
  assert.equal(invalid.isError, true);
  assert.deepEqual(errors, []);
  console.log("PASS: external plan, failed plan, Escape/error, UI wait, assistant-final context and branch reset");
+ // Evidence must be paired with new successful execution, not just a changed plan or any tool call.
+ const plan = async (progress) => runner.emitToolResult({ type: "tool_result", toolName: "update_plan", toolCallId: "p", input: { steps, progress }, content: [], isError: false });
+ const work = async (text, isError = false) => runner.emitToolResult({ type: "tool_result", toolName: "bash", toolCallId: "w", input: { command: "verify" }, content: [{ type: "text", text }], isError });
+ const fresh = async () => { await runner.emit({ type: "input", text: "new", source: "interactive" }); await plan(); };
+ const evidence = (n) => ({ files_changed: [], verification: [`Check ${n} passed`], decisions: [] });
+ await fresh();
+ for (let n = 0; n < 4; n++) {
+  await work(`Check ${n} passed`); await plan(evidence(n));
+  assert.equal((await boundary()).continue, true, "same step status with paired new evidence must continue");
+ }
+ await checkpoint.execute("e", { steps, progress: evidence(4) }, undefined, undefined, ctx);
+ await work("Check 4 passed");
+ assert.equal((await boundary()).continue, true, "fallback checkpoint supports progress before execution results");
+ for (const mode of ["tools-only", "evidence-only", "failed-work", "repeated-work", "cosmetic-plan", "empty-work", "report-only"]) {
+  await fresh();
+  for (let n = 0; n < 3; n++) {
+   if (mode === "tools-only") await work(`output ${n}`);
+   if (mode === "empty-work") { await work("   "); await plan(evidence(n)); }
+   if (mode === "report-only") { await runner.emitToolResult({ type: "tool_result", toolName: "talk_report_brief", toolCallId: "r", input: {}, content: [{ type: "text", text: `report ${n}` }], isError: false }); await plan(evidence(n)); }
+   if (mode === "evidence-only") await plan(evidence(n));
+   if (mode === "failed-work") { await work(`failure ${n}`, true); await plan(evidence(n)); }
+   if (mode === "repeated-work") { await work("same output"); await plan(evidence(n)); }
+   if (mode === "cosmetic-plan") await runner.emitToolResult({ type: "tool_result", toolName: "update_plan", toolCallId: "p", input: { steps: steps.map(s => ({ ...s, goal: `${s.goal} ${n}` })) }, content: [], isError: false });
+   const result = await boundary();
+   if (n < 2) assert.equal(result.continue, true);
+   else {
+    assert.equal(result.continue, false, mode);
+    assert.match(result.entries[0].content, /连续无进展/);
+    assert.match(result.entries[0].content, /verify/);
+   }
+  }
+ }
+ await fresh();
+ for (let n = 0; n < 9; n++) {
+  await work(`unique ${n}`); await plan(evidence(n));
+  const result = await boundary();
+  if (n < 8) assert.equal(result.continue, true);
+  else { assert.equal(result.continue, false); assert.match(result.entries[0].content, /累计纠正达到 8 次/); }
+ }
+ assert.deepEqual(errors, []);
+ console.log("PASS: paired evidence, checkpoint progress, repeated/failed/unpaired/cosmetic changes and total limit");
 } finally { session.dispose(); }
