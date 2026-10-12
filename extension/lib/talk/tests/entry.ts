@@ -756,7 +756,7 @@ test("extension: actual tool registration enforces target permit and rejects cro
 	eq(sent.length, 3);
 	eq(rtBefore.active, false, "ordinary reports do not start side sessions");
 	ok(!rtBefore.server, "ordinary reports do not start a server");
-	eq([...hooks.keys()].join(","), "agent_start,session_shutdown,before_agent_start,tool_result,agent_settled,session_before_switch,session_before_fork,session_tree");
+	eq([...hooks.keys()].join(","), "input,session_start,session_switch,session_fork,session_tree,agent_start,session_shutdown,before_agent_start,tool_result,agent_settled,session_before_switch,session_before_fork");
 	for (const name of ["talk_render", "talk_prepare_report", "talk_report_images", "talk_set_style", "talk_status"]) ok(tools.has(name));
 	for (const fn of hookLists.get("before_agent_start")!) await fn({ prompt: "verify feature", systemPrompt: "base" }, { sessionManager: { getSessionId: () => "session" } });
 	await hooks.get("tool_result")({ toolName: "bash", toolCallId: "observed", content: [{ type: "text", text: "passed" }], isError: false });

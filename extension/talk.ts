@@ -81,6 +81,19 @@ export default function (pi: ExtensionAPI) {
 	const enqueueDelivery = createDeliveryQueue();
 	const reportScope = createReportScope();
 	const reportGate = createReportGate();
+	let reportPickerRequested = false;
+	// Fail closed: presentation authorization comes from user request, never tool arguments.
+	// Match direct requests only; mentions, quoted text and questions are not authorization.
+	const requestsReportPicker = (prompt: string) => prompt.split(/\n/).some((line) => {
+		const text = line.trim();
+		if (/[?？]/.test(text) || /^(?:不要|不需要|不用|禁止|别|do not|don't|no\b)/i.test(text)) return false;
+		return /^(?:请|帮我|给我)?(?:选择|挑选)(?:一下|本次|这次)?(?:汇报|报告)格式[。！.!]*$/.test(text)
+			|| /^(?:请|帮我|给我)?(?:生成|制作|输出|提供)(?:一份|一个|本次|这次)?\s*(?:HTML|网页|图片|图像|一张图|富媒体)\s*(?:汇报|报告)(?:[，,。！.!]|$)/i.test(text)
+			|| /^(?:please\s+)?(?:create|generate|make|provide)\s+(?:an?\s+)?(?:html|image|rich[- ]media)\s+report(?:[,.!]|$)/i.test(text)
+			|| /^(?:please\s+)?(?:choose|select)\s+(?:the\s+)?report\s+format[.!]*$/i.test(text);
+	});
+	pi.on("input", () => { reportPickerRequested = false; });
+	for (const event of ["session_start", "session_switch", "session_fork", "session_tree"] as const) pi.on(event, () => { reportPickerRequested = false; });
 	const triggers = registerTalkLifecycle(pi, {
 		resetPermit: () => reportGate.reset(),
 		stop: async () => { await stopSession(getRuntime()); },
@@ -95,6 +108,7 @@ export default function (pi: ExtensionAPI) {
 
 	triggers.registerSessionHooks();
 	pi.on("before_agent_start", (event, ctx) => {
+		reportPickerRequested = requestsReportPicker(event.prompt);
 		// /talk asks about the preceding task; do not erase its tool evidence.
 		const scope = reportScope.start(ctx?.sessionManager?.getSessionId() || "current", !!information.context().goal);
 		if (!scope.preserveEvidence) information.begin(event.prompt);
@@ -474,9 +488,13 @@ export default function (pi: ExtensionAPI) {
 			remainingWork: Type.Array(Type.String(), { description: "Every unresolved requirement, blocker or pending check; must be empty" }),
 		}),
 		async execute(_id, params, _signal, _onUpdate, ctx) {
+			if (!reportPickerRequested) {
+				return { content: [{ type: "text", text: "用户未明确请求富媒体汇报或选择汇报格式；不打开选择器。请直接在主对话中提供默认文字汇报，不要再次询问格式。" }], details: { ok: false, reason: "explicit-report-request-required" } };
+			}
 			if (!ctx.hasUI) {
 				return { content: [{ type: "text", text: "No interactive UI to ask for a report type; no formal report authorized." }], details: { ok: false } };
 			}
+			reportPickerRequested = false;
 			const result = await reportGate.prepare(params, (question, options) => ctx.ui.select(question, options));
 			return {
 				content: [{ type: "text", text: result.ok

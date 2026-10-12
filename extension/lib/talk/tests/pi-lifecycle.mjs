@@ -51,6 +51,28 @@ try {
  const promptPolicy = await runner.emitBeforeAgentStart("Verify A", undefined, { customPrompt: "test", cwd: process.cwd() });
  assert.ok(JSON.stringify(promptPolicy).includes("Continue authorized execution after updates"));
  assert.ok(JSON.stringify(promptPolicy).includes("do not ask again for already granted permission"));
+ // Exercise the actual registered tool/UI callback, not just its description.
+ const prepareReport = runner.getToolDefinition("talk_prepare_report");
+ let pickerCalls = 0;
+ const pickerCtx = { ...ctx, hasUI: true, ui: { ...ctx.ui, select: async () => { pickerCalls++; return "简要汇报"; } } };
+ const doneReport = { summary: "done", checks: ["passed"], remainingWork: [] };
+ for (const prompt of ["继续", "完成后汇报", "请用文字汇报", "不要生成 HTML 汇报", "为什么会弹出选择汇报格式？", "修复工具误调用 talk_prepare_report", "引用：‘请选择汇报格式’"]) {
+  await runner.emitBeforeAgentStart(prompt, undefined, { customPrompt: "test", cwd: process.cwd() });
+  const result = await prepareReport.execute("ordinary", doneReport, undefined, undefined, pickerCtx);
+  assert.equal(result.details.ok, false, prompt);
+  assert.equal(pickerCalls, 0, prompt);
+  assert.match(result.content[0].text, /文字/);
+ }
+ for (const prompt of ["请选择汇报格式", "请生成 HTML 汇报", "Please create an HTML report"]) {
+  await runner.emitBeforeAgentStart(prompt, undefined, { customPrompt: "test", cwd: process.cwd() });
+  const result = await prepareReport.execute("explicit", doneReport, undefined, undefined, pickerCtx);
+  assert.equal(result.details.ok, true, prompt);
+ }
+ assert.equal(pickerCalls, 3);
+ await runner.emitBeforeAgentStart("继续", undefined, { customPrompt: "test", cwd: process.cwd() });
+ assert.equal((await prepareReport.execute("stale", doneReport, undefined, undefined, pickerCtx)).details.ok, false);
+ assert.equal(pickerCalls, 3, "new ordinary input cannot inherit picker authorization");
+ await runner.emitBeforeAgentStart("Verify A", undefined, { customPrompt: "test", cwd: process.cwd() });
  await runner.emitToolResult({ type: "tool_result", toolName: "bash", toolCallId: "real-runner", input: { command: "test" }, content: [{ type: "text", text: "passed" }], isError: false });
  const evidenceTool = runner.getToolDefinition("talk_report_context");
  const briefTool = runner.getToolDefinition("talk_report_brief");
