@@ -131,6 +131,23 @@ try {
   if (n < 8) assert.equal(result.continue, true);
   else { assert.equal(result.continue, false); assert.match(result.entries[0].content, /累计纠正达到 8 次/); }
  }
+ await runner.emit({ type: "input", text: "acceptance", source: "interactive" });
+ const done = steps.map(s => ({ ...s, status: "completed" }));
+ const checks = [{ id: "render", goal: "Render and inspect", required: true, status: "pending" }];
+ await checkpoint.execute("a", { steps: done, acceptance: checks }, undefined, undefined, ctx);
+ assert.equal((await boundary()).continue, true, "completed steps cannot bypass required acceptance");
+ await checkpoint.execute("a", { acceptance: [] }, undefined, undefined, ctx);
+ assert.equal((await boundary()).continue, true, "omitting acceptance cannot clear it");
+ await checkpoint.execute("b", { acceptance: [{ ...checks[0], status: "blocked" }], blocker: { kind: "environment", reason: "Allowed export timed out; other browsers forbidden", nextAction: "Restore permitted renderer" } }, undefined, undefined, ctx);
+ const partial = await boundary();
+ assert.equal(partial.continue, false);
+ assert.match(partial.entries[0].content, /受限交付/);
+ assert.match(partial.entries[0].content, /render/);
+ const badPass = await checkpoint.execute("c", { acceptance: [{ ...checks[0], status: "passed" }] }, undefined, undefined, ctx);
+ assert.equal(badPass.isError, true, "passed acceptance needs evidence");
+ await checkpoint.execute("d", { steps: done, acceptance: [{ ...checks[0], status: "passed", evidence: ["Actual render inspected"] }] }, undefined, undefined, ctx);
+ assert.equal((await boundary()).continue, false);
  assert.deepEqual(errors, []);
+ console.log("PASS: required acceptance continuation, retention, restricted delivery and evidence validation");
  console.log("PASS: paired evidence, checkpoint progress, repeated/failed/unpaired/cosmetic changes and total limit");
 } finally { session.dispose(); }
