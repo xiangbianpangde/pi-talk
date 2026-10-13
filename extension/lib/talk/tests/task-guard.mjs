@@ -1,5 +1,6 @@
 /** Offline real SDK acceptance test. Uses only a disposable HOME and deterministic provider. */
 import assert from "node:assert/strict";
+import { createRequire } from "node:module";
 import { mkdtempSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -8,7 +9,20 @@ import { execFileSync } from "node:child_process";
 if (!process.env.TASK_GUARD_TEST_HOME) {
  const root = mkdtempSync(join(tmpdir(), "task-guard-test-"));
  const home = join(root, "home"); mkdirSync(home);
- try { execFileSync(process.execPath, [process.argv[1]], { stdio: "inherit", env: { ...process.env, HOME: home, TASK_GUARD_TEST_HOME: home } }); }
+ try {
+ const entries = (process.env.TASK_GUARD_ENTRIES || "extension/task-guard.ts").split(",");
+ const { build } = await import(pathToFileURL(join(process.env.HOME, ".pi/agent/npm/node_modules/esbuild/lib/main.js")));
+ const bundled = [];
+ for (const [i, entry] of entries.entries()) {
+  const out = join(root, `extension-${i}.mjs`);
+  await build({ entryPoints: [resolve(entry)], bundle: true, platform: "node", format: "esm", outfile: out, plugins: [{ name: "dependencies", setup(b) {
+   b.onResolve({ filter: /^typebox$/ }, () => ({ path: createRequire(import.meta.url).resolve("typebox", { paths: [join(process.env.HOME, ".pi/agent/npm/node_modules/pi-subagents")] }) }));
+   b.onResolve({ filter: /npm\/node_modules\/parse5\/dist\/index\.js$/ }, () => ({ path: join(process.env.HOME, ".pi/agent/npm/node_modules/parse5/dist/index.js") }));
+  } }], logLevel: "silent" });
+  bundled.push(out);
+ }
+ execFileSync(process.execPath, [process.argv[1]], { stdio: "inherit", env: { ...process.env, HOME: home, TASK_GUARD_TEST_HOME: home, TASK_GUARD_ENTRIES: bundled.join(",") } });
+ }
  finally { rmSync(root, { recursive: true, force: true }); }
  process.exit(0);
 }
@@ -16,9 +30,11 @@ const pkg = process.env.PI_CODING_AGENT_PACKAGE || "/opt/homebrew/lib/node_modul
 const { createAgentSession, DefaultResourceLoader, SettingsManager, SessionManager } = await import(pathToFileURL(join(pkg, "dist/index.js")));
 const { createAssistantMessageEventStream } = await import(pathToFileURL(join(pkg, "node_modules/@earendil-works/pi-ai/dist/utils/event-stream.js")));
 const settingsManager = SettingsManager.inMemory({ defaultTools: [], compaction: { enabled: false }, retry: { enabled: false } });
-const resourceLoader = new DefaultResourceLoader({ cwd: process.cwd(), agentDir: join(process.env.HOME, ".pi/agent"), settingsManager, noExtensions: true, noSkills: true, noThemes: true, noPromptTemplates: true, additionalExtensionPaths: [resolve("extension/task-guard.ts")] });
+const resourceLoader = new DefaultResourceLoader({ cwd: process.cwd(), agentDir: join(process.env.HOME, ".pi/agent"), settingsManager, noExtensions: true, noSkills: true, noThemes: true, noPromptTemplates: true, additionalExtensionPaths: (process.env.TASK_GUARD_ENTRIES || "extension/task-guard.ts").split(",").map((path) => resolve(path)) });
 await resourceLoader.reload();
 assert.deepEqual(resourceLoader.getExtensions().errors, []);
+const loaded = resourceLoader.getExtensions().extensions;
+assert.equal(loaded.filter((extension) => extension.tools.has("task_guard_checkpoint")).length, 1, "task guard registers once across entrypoints");
 const { session } = await createAgentSession({ cwd: process.cwd(), agentDir: join(process.env.HOME, ".pi/agent"), settingsManager, resourceLoader, sessionManager: SessionManager.inMemory(), noTools: "builtin" });
 const model = { id: "fixture", name: "Fixture", api: "openai-completions", provider: "openai", baseUrl: "http://127.0.0.1", reasoning: false, input: ["text"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 32768, maxTokens: 1024 };
 const usage = { input: 1, output: 1, cacheRead: 0, cacheWrite: 0, totalTokens: 2, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } };

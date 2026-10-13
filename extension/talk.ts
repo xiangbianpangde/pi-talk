@@ -5,6 +5,7 @@
  * (static HTML → interactive HTML+JS → custom packs) without rewriting core.
  */
 import { createHash } from "node:crypto";
+import installTaskGuard from "./task-guard";
 import { createInformationEngine, briefText } from "./lib/talk/information";
 import { createDeliveryQueue, deliverBrief } from "./lib/talk/delivery";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
@@ -76,6 +77,7 @@ async function pickStyle(ctx: { ui: { select: Function } }, runtime = getRuntime
 }
 
 export default function (pi: ExtensionAPI) {
+	installTaskGuard(pi);
 	const runtime = getRuntime();
 	const information = createInformationEngine();
 	const enqueueDelivery = createDeliveryQueue();

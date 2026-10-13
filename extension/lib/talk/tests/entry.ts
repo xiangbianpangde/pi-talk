@@ -725,10 +725,10 @@ test("session: render persists version + meta", async () => {
 test("extension: bare summary retains evidence but message starts new scope", async () => {
 	const hooks = new Map<string, any[]>(), tools = new Map<string, any>();
 	let command: any;
-	registerTalk({ on: (name: string, fn: any) => { hooks.set(name, [...(hooks.get(name) || []), fn]); }, registerTool: (tool: any) => tools.set(tool.name, tool), registerCommand: (_name: string, cmd: any) => { command = cmd; }, sendUserMessage: async () => {} } as any);
+	registerTalk({ events: { emit: () => {}, on: () => () => {} }, on: (name: string, fn: any) => { hooks.set(name, [...(hooks.get(name) || []), fn]); }, registerTool: (tool: any) => tools.set(tool.name, tool), registerCommand: (_name: string, cmd: any) => { command = cmd; }, sendUserMessage: async () => {} } as any);
 	const before = async (prompt: string) => { for (const fn of hooks.get("before_agent_start")!) await fn({ prompt, systemPrompt: "base" }); };
 	await before("Fix A");
-	await hooks.get("tool_result")![0]({ toolName: "bash", toolCallId: "a", input: {}, content: [{ type: "text", text: "A passed" }], isError: false });
+	await hooks.get("tool_result")!.at(-1)({ toolName: "bash", toolCallId: "a", input: {}, content: [{ type: "text", text: "A passed" }], isError: false });
 	await command.handler("", { mode: "tui" }); await before("summarize");
 	eq((await tools.get("talk_report_context").execute()).details.goal, "Fix A");
 	await command.handler("Analyze B", { mode: "tui" }); await before("Analyze B");
@@ -741,13 +741,13 @@ test("extension: actual tool registration enforces target permit and rejects cro
 	const hooks = new Map<string, any>();
 	const hookLists = new Map<string, any[]>();
 	const commands = new Map<string, any>();
-	registerTalk({ on: (name: string, fn: unknown) => { hooks.set(name, fn); hookLists.set(name, [...(hookLists.get(name) || []), fn]); }, registerTool: (tool: any) => tools.set(tool.name, tool), registerCommand: (name: string, cmd: unknown) => commands.set(name, cmd) } as any);
+	registerTalk({ events: { emit: () => {}, on: () => () => {} }, on: (name: string, fn: unknown) => { hooks.set(name, fn); hookLists.set(name, [...(hookLists.get(name) || []), fn]); }, registerTool: (tool: any) => tools.set(tool.name, tool), registerCommand: (name: string, cmd: unknown) => commands.set(name, cmd) } as any);
 	ok(commands.has("talk"));
 	const rtBefore = getRuntime();
 	await stopSession(rtBefore);
 	const sent: string[] = [];
 	// Replace only delivery; command routing and session implementation are real.
-	const fakePi = { on: () => {}, registerTool: () => {}, registerCommand: (name: string, cmd: any) => commands.set(name, cmd), sendUserMessage: async (text: string) => { sent.push(text); } };
+	const fakePi = { events: { emit: () => {}, on: () => () => {} }, on: () => {}, registerTool: () => {}, registerCommand: (name: string, cmd: any) => commands.set(name, cmd), sendUserMessage: async (text: string) => { sent.push(text); } };
 	registerTalk(fakePi as any);
 	const textCtx = { mode: "tui", ui: { select: () => { throw new Error("Unexpected picker"); }, notify: () => {} } };
 	await commands.get("talk").handler("", textCtx);
@@ -756,7 +756,7 @@ test("extension: actual tool registration enforces target permit and rejects cro
 	eq(sent.length, 3);
 	eq(rtBefore.active, false, "ordinary reports do not start side sessions");
 	ok(!rtBefore.server, "ordinary reports do not start a server");
-	eq([...hooks.keys()].join(","), "input,session_start,session_switch,session_fork,session_tree,agent_start,session_shutdown,before_agent_start,tool_result,agent_settled,session_before_switch,session_before_fork");
+	eq([...hooks.keys()].join(","), "session_shutdown,input,session_start,session_switch,session_fork,session_tree,ui_prompt_start,ui_prompt_end,before_agent_start,tool_result,agent_before_settle,agent_start,agent_settled,session_before_switch,session_before_fork");
 	for (const name of ["talk_render", "talk_prepare_report", "talk_report_images", "talk_set_style", "talk_status"]) ok(tools.has(name));
 	for (const fn of hookLists.get("before_agent_start")!) await fn({ prompt: "verify feature", systemPrompt: "base" }, { sessionManager: { getSessionId: () => "session" } });
 	await hooks.get("tool_result")({ toolName: "bash", toolCallId: "observed", content: [{ type: "text", text: "passed" }], isError: false });

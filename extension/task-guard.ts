@@ -8,6 +8,14 @@ type Blocker = { kind: "missing_input" | "authorization" | "environment"; reason
 const stepSchema = Type.Object({ id: Type.String({ minLength: 1 }), goal: Type.String({ minLength: 1 }), status: Type.Union([Type.Literal("pending"), Type.Literal("in_progress"), Type.Literal("completed")]) });
 
 export default function taskGuard(pi: ExtensionAPI) {
+	// The shared session bus coordinates separate extension APIs (and loader copies).
+	const claim = { installed: false };
+	pi.events.emit("pi-talk:task-guard-installed", claim);
+	if (claim.installed) return;
+	const release = pi.events.on("pi-talk:task-guard-installed", (value: unknown) => {
+		(value as { installed: boolean }).installed = true;
+	});
+	pi.on("session_shutdown", release);
 	let steps: Step[] = [];
 	let blocker: Blocker | undefined;
 	const executionSeen = new Set<string>();
